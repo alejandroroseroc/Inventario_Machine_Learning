@@ -1,0 +1,27 @@
+from django.db import models
+from django.contrib.auth.models import User
+
+class Producto(models.Model):
+    codigo = models.CharField(max_length=50, unique=True)
+    nombre = models.CharField(max_length=200)
+    categoria = models.CharField(max_length=1, choices=[("A","A"),("B","B"),("C","C")], default="C")
+    punto_reorden = models.IntegerField(default=0)
+    valor_unitario = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"{self.codigo} - {self.nombre}"
+
+class Lote(models.Model):
+    producto = models.ForeignKey(Producto, related_name="lotes", on_delete=models.CASCADE)
+    fecha_caducidad = models.DateField()
+    stock_lote = models.IntegerField(default=0)
+    fecha_ingreso = models.DateField(auto_now_add=True)
+
+class Movimiento(models.Model):
+    TIPO = (("entrada","entrada"), ("salida","salida"), ("ajuste","ajuste"))
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
+    lote = models.ForeignKey(Lote, null=True, blank=True, on_delete=models.SET_NULL)
+    usuario = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    tipo = models.CharField(max_length=10, choices=TIPO)
+    cantidad = models.IntegerField()
+    fecha_mov = models.DateTimeField(auto_now_add=True)

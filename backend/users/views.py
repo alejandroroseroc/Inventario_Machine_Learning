@@ -1,19 +1,28 @@
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import RegisterSerializer, LoginSerializer
+from .repositories import UserRepository
+from .services import AuthService
+from .adapters import JwtAdapter
+from .exceptions import EmailAlreadyRegistered, InvalidCredentials
+
+def make_auth_service():
+    return AuthService(UserRepository(), JwtAdapter())
 
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"message":"Usuario creado correctamente"}, status=status.HTTP_201_CREATED)
+        s = RegisterSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        svc = make_auth_service()
+        try:
+            user = svc.register(s.validated_data["email"], s.validated_data["password"])
+        except EmailAlreadyRegistered as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": "Usuario creado correctamente", "user": user},
+                        status=status.HTTP_201_CREATED)
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -21,17 +30,12 @@ class LoginView(APIView):
     def post(self, request):
         s = LoginSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        email = s.validated_data["email"]
-        password = s.validated_data["password"]
-        user = authenticate(username=email, password=password)
-        if not user:
-            return Response({"detail":"Credenciales inválidas"}, status=401)
-        refresh = RefreshToken.for_user(user)
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "user": {"id": user.id, "email": user.email}
-        })
+        svc = make_auth_service()
+        try:
+            data = svc.login(s.validated_data["email"], s.validated_data["password"])
+        except InvalidCredentials as e:
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response(data)
 
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]

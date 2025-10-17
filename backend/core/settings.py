@@ -1,4 +1,3 @@
-# core/settings.py
 from pathlib import Path
 from datetime import timedelta
 
@@ -21,6 +20,7 @@ INSTALLED_APPS = [
     'corsheaders',
     # Apps del proyecto
     'users',
+    'inventory',
 ]
 
 # Middleware
@@ -87,7 +87,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.AllowAny",  # en dev; en prod usa IsAuthenticated por defecto
+        "rest_framework.permissions.AllowAny",
     ),
 }
 

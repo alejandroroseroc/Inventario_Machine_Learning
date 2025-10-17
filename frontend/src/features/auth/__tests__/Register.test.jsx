@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
-import Register from './register'
+import Register from '../pages/register'
 
 function setup() {
   render(<BrowserRouter><Register /></BrowserRouter>)

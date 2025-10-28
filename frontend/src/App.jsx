@@ -5,8 +5,8 @@ import PrivateRoute from "./components/PrivateRoute";
 
 import Register from "./features/auth/pages/register";
 import Login    from "./features/auth/pages/login";
-
-function Panel(){ return <h2>Panel (privado)</h2>; }
+import Panel    from "./features/panel/pages/panel";
+import "./styles/panel.css";
 
 export default function App(){
   return (

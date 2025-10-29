@@ -1,65 +1,104 @@
-// src/features/auth/pages/register.jsx
-import { useState, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useRegister } from "../hooks";
-import PasswordStrength from "../components/PasswordStrength";
+import { useState } from "react";
+import { useAuth } from "../../../context/AuthContext";
+import { useNavigate, Link } from "react-router-dom";
 
-const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export default function RegisterPage() {
+  const { register, login } = useAuth();
+  const navigate = useNavigate();
 
-export default function Register(){
-  const nav = useNavigate();
-  const { submit, loading, error } = useRegister();  // mantengo tu API
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [okMsg, setOkMsg] = useState(null);
 
-  const emailOk = useMemo(()=>emailRx.test(email),[email]);
-  const pwOk = useMemo(()=>password.length>=8,[password]);
-  const match = useMemo(()=>password && password===confirm,[password,confirm]);
-  const valid = emailOk && pwOk && match && !loading;
-
-  async function onSubmit(e){
+  async function onSubmit(e) {
     e.preventDefault();
-    if(!valid) return;
-    const res = await submit({ email, password });
-    if(res?.ok !== false){               // tu hook retorna ok? maneja ambos casos
-      alert("Registro exitoso. Ahora inicia sesión.");
-      nav("/login");
+    setError(null);
+    setOkMsg(null);
+
+    if (password !== confirm) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1) Creo el usuario
+      await register({ email, password });
+
+      // 2) Auto-login para entrar directo al panel
+      await login({ email, password });
+
+      setOkMsg("¡Usuario creado! Entrando al panel...");
+      navigate("/panel", { replace: true });
+    } catch (err) {
+      setError(err?.message || "No fue posible registrar el usuario.");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div className="auth-wrap">
-      <div className="auth-card">
-        <h1 className="auth-title">Crear cuenta</h1>
-        <p className="auth-subtitle">Regístrate para usar el sistema</p>
+    <section className="max-w-md mx-auto p-6">
+      <h1 className="text-2xl font-semibold mb-4">Crear cuenta</h1>
 
-        <form onSubmit={onSubmit} noValidate>
-          <label htmlFor="email">Correo electrónico</label>
-          <input id="email" type="email" value={email}
-                 onChange={e=>setEmail(e.target.value)} required />
+      {error && <div className="mb-3 rounded bg-red-100 text-red-700 p-2">{error}</div>}
+      {okMsg && <div className="mb-3 rounded bg-green-100 text-green-700 p-2">{okMsg}</div>}
 
-          <label htmlFor="pw">Contraseña</label>
-          <input id="pw" type="password" value={password}
-                 onChange={e=>setPassword(e.target.value)} required minLength={8}/>
-          <PasswordStrength value={password}/>
-          <p className="small">Mínimo 8 caracteres, combina mayúsculas, números y símbolos.</p>
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm mb-1">Correo</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            autoComplete="email"
+            required
+          />
+        </div>
 
-          <label htmlFor="pw2">Confirmar contraseña</label>
-          <input id="pw2" type="password" value={confirm}
-                 onChange={e=>setConfirm(e.target.value)} required />
+        <div>
+          <label className="block text-sm mb-1">Contraseña</label>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            autoComplete="new-password"
+            required
+          />
+        </div>
 
-          {error && <div className="error" role="alert">{error}</div>}
+        <div>
+          <label className="block text-sm mb-1">Confirmar contraseña</label>
+          <input
+            type="password"
+            value={confirm}
+            onChange={e => setConfirm(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            autoComplete="new-password"
+            required
+          />
+        </div>
 
-          <div className="actions">
-            <button disabled={!valid}>{loading ? "Creando..." : "Registrarme"}</button>
-          </div>
-        </form>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded bg-blue-600 text-white py-2 hover:bg-blue-700 disabled:opacity-60"
+        >
+          {loading ? "Creando..." : "Crear cuenta"}
+        </button>
+      </form>
 
-        <p className="small" style={{marginTop:12}}>
-          ¿Ya tienes cuenta? <Link className="link" to="/login">Inicia sesión</Link>
-        </p>
-      </div>
-    </div>
+      <p className="text-sm mt-4 text-center">
+        ¿Ya tienes cuenta?{" "}
+        <Link to="/login" className="text-blue-600 hover:underline">
+          Inicia sesión
+        </Link>
+      </p>
+    </section>
   );
 }

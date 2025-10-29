@@ -13,6 +13,7 @@ export default function App(){
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<PrivateRoute><Panel/></PrivateRoute>} />
           <Route path="/register" element={<Register/>}/>
           <Route path="/login" element={<Login/>}/>
           <Route path="/panel" element={<PrivateRoute><Panel/></PrivateRoute>}/>

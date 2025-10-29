@@ -1,60 +1,80 @@
-// src/features/auth/pages/login.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import { login as loginService } from "../service";
 
-export default function Login(){
-  const { login } = useAuth();
-  const nav = useNavigate();
-  const [email,setEmail] = useState("");
-  const [password,setPassword] = useState("");
-  const [err,setErr] = useState("");
-  const [loading,setLoading] = useState(false);
+export default function LoginPage() {
+  const { login, token } = useAuth();
+  const navigate = useNavigate();
 
-  async function onSubmit(e){
-    e.preventDefault(); setErr(""); setLoading(true);
-    try{
-      const data = await loginService({ email, password });
-      login({ access: data.access, user: data.user });
-      nav("/panel");
-    }catch(e){ setErr(e.message); }
-    finally{ setLoading(false); }
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (token) navigate("/panel", { replace: true });
+  }, [token, navigate]);
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await login({ email, password });
+      navigate("/panel", { replace: true });
+    } catch (err) {
+      setError(err?.message || "Credenciales inválidas");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div className="auth-wrap">
-      <div className="auth-card">
-        <h1 className="auth-title">Ingresar</h1>
-        <p className="auth-subtitle">Ingrese sus credenciales para acceder al sistema.</p>
+    <section className="max-w-md mx-auto p-6">
+      <h1 className="text-2xl font-semibold mb-4">Iniciar sesión</h1>
 
-        <form onSubmit={onSubmit} noValidate>
-          <label htmlFor="email">Correo electrónico</label>
-          <input id="email" type="email" value={email}
-                 onChange={e=>setEmail(e.target.value)} required />
+      {error && <div className="mb-3 rounded bg-red-100 text-red-700 p-2">{error}</div>}
 
-          <label htmlFor="pw">Contraseña</label>
-          <input id="pw" type="password" value={password}
-                 onChange={e=>setPassword(e.target.value)} required />
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm mb-1">Correo</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            autoComplete="email"
+            required
+          />
+        </div>
 
-          <div className="row">
-            <input id="remember" type="checkbox" disabled />
-            <label htmlFor="remember" className="small">Recordarme</label>
-            <div style={{flex:1}}/>
-            <a href="#" className="link" onClick={e=>e.preventDefault()}>¿Olvidaste tu contraseña?</a>
-          </div>
+        <div>
+          <label className="block text-sm mb-1">Contraseña</label>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            autoComplete="current-password"
+            required
+          />
+        </div>
 
-          {err && <div className="error" role="alert">{err}</div>}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded bg-blue-600 text-white py-2 hover:bg-blue-700 disabled:opacity-60"
+        >
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
+      </form>
 
-          <div className="actions">
-            <button disabled={loading}>{loading ? "Ingresando..." : "iniciar sesión"}</button>
-          </div>
-        </form>
-
-        <p className="small" style={{marginTop:12}}>
-          ¿Aún no tienes una cuenta? <Link className="link" to="/register">Regístrate</Link>
-        </p>
-      </div>
-    </div>
+      <p className="text-sm mt-4 text-center">
+        ¿No tienes cuenta?{" "}
+        <Link to="/register" className="text-blue-600 hover:underline">
+          Regístrate
+        </Link>
+      </p>
+    </section>
   );
 }

@@ -1,7 +1,8 @@
 from datetime import date, timedelta
-from django.db import transaction
+from django.utils import timezone
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 from django.db.models.functions import Coalesce
+
 from .models import Producto, Lote, Movimiento
 
 def productos_con_stock_total():
@@ -35,9 +36,28 @@ def movimientos_recientes(n=3):
         .order_by("-fecha_mov")[:n]
     )
 
-def crear_producto(data: dict):
-    with transaction.atomic():
-        return Producto.objects.create(**data)
+# ====== NUEVO: soporte para ABC y ROP ======
 
-def listar_productos():
-    return Producto.objects.all().order_by("nombre")
+def _desde_hace(dias=30):
+    hoy = timezone.now().date()
+    return hoy - timedelta(days=dias)
+
+def ventas_cantidad_ultimos_dias(producto, dias=30):
+    desde = _desde_hace(dias)
+    agg = (Movimiento.objects
+           .filter(producto=producto, tipo="salida", fecha_mov__date__gte=desde)
+           .aggregate(total=Coalesce(Sum("cantidad"), 0)))
+    return int(agg["total"] or 0)
+
+def demanda_media_diaria(producto, dias=30):
+    total = ventas_cantidad_ultimos_dias(producto, dias=dias)
+    return total / float(dias)
+
+def ingresos_por_producto(dias=30):
+    """ Dict {producto_id: ingresos_30d} """
+    desde = _desde_hace(dias)
+    rows = (Movimiento.objects
+            .filter(tipo="salida", fecha_mov__date__gte=desde)
+            .values("producto_id")
+            .annotate(total=Coalesce(Sum(F("cantidad") * F("producto__valor_unitario")), 0)))
+    return {r["producto_id"]: r["total"] for r in rows}

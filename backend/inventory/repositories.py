@@ -61,3 +61,17 @@ def ingresos_por_producto(dias=30):
             .values("producto_id")
             .annotate(total=Coalesce(Sum(F("cantidad") * F("producto__valor_unitario")), 0)))
     return {r["producto_id"]: r["total"] for r in rows}
+
+def lotes_de_producto(producto_id: int):
+    return (
+        Lote.objects
+        .filter(producto_id=producto_id)
+        .order_by("fecha_caducidad", "id")
+    )
+
+def crear_lote(producto_id: int, fecha_caducidad, stock_lote: int):
+    return Lote.objects.create(
+        producto_id=producto_id,
+        fecha_caducidad=fecha_caducidad,
+        stock_lote=stock_lote,
+    )

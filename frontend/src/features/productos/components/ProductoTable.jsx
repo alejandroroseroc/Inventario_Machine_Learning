@@ -1,4 +1,3 @@
-// src/features/productos/components/ProductosTable.jsx
 export default function ProductoTable({ items }) {
   if (!items || items.length === 0) {
     return <p>No hay productos registrados.</p>;
@@ -23,14 +22,24 @@ export default function ProductoTable({ items }) {
               <td style={td}>{p.id}</td>
               <td style={td}>{p.codigo}</td>
               <td style={td}>{p.nombre}</td>
-              <td style={td}>{p.categoria}</td>
+              <td style={td}><Badge kind={p.categoria} /></td>
               <td style={td}>{p.punto_reorden}</td>
-              <td style={td}>${Number(p.valor_unitario).toFixed(2)}</td>
+              <td style={td}>${Number(p.valor_unitario).toLocaleString("es-CO")}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function Badge({ kind }) {
+  const map = { A: "#0ea5e9", B: "#22c55e", C: "#f59e0b" };
+  return (
+    <span style={{
+      background: map[kind] || "#94a3b8",
+      color: "white", borderRadius: 999, padding: "2px 10px", fontSize: 12
+    }}>{kind}</span>
   );
 }
 

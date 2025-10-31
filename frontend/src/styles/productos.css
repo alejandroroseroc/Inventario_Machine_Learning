@@ -1,0 +1,44 @@
+/* Navbar */
+.nav { background: #0f172a; color: #fff; }
+.nav__wrap { display: flex; align-items: center; gap: 16px; padding: 10px 16px; }
+.nav__brand { font-weight: 700; color: #fff; text-decoration: none; }
+.nav__menu { display: flex; gap: 12px; }
+.nav__link { color: #cbd5e1; text-decoration: none; padding: 6px 10px; border-radius: 8px; }
+.nav__link.active { background: #1e293b; color: #fff; }
+.nav__spacer { flex: 1; }
+.nav__logout { color: #fecaca; text-decoration: none; }
+
+/* Page */
+.page { max-width: 1000px; margin: 20px auto; padding: 0 16px; }
+.page__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.link-back { text-decoration: none; }
+
+/* Help box */
+.help { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 14px 0 20px; }
+.help h3 { margin-top: 0; }
+.help__note { font-size: 12px; color: #475569; }
+
+/* Cards & layout */
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+.row { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.row--tight { grid-template-columns: 1fr auto; align-items: end; }
+.col { display: grid; gap: 6px; }
+.col--auto { width: max-content; }
+.col--full { grid-column: 1 / -1; }
+
+label { font-weight: 600; }
+input, select, button { padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; }
+input:focus, select:focus { outline: none; border-color: #64748b; }
+.hint { font-size: 12px; color: #64748b; }
+
+.switch { display: flex; align-items: center; gap: 10px; padding-top: 18px; }
+
+/* Alerts */
+.alert { padding: 12px; border-radius: 12px; margin-bottom: 12px; }
+.alert--error { background: #fee2e2; border: 1px solid #fecaca; color: #7f1d1d; }
+.alert--ok { background: #dcfce7; border: 1px solid #bbf7d0; color: #14532d; }
+
+/* Buttons */
+.btn { cursor: pointer; }
+.btn--primary { background: #16a34a; color: white; border: 1px solid #16a34a; }
+.btn--primary:disabled { opacity: .6; cursor: default; }

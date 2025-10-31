@@ -1,24 +1,27 @@
 import { useEffect, useState } from "react";
-import { productosList, productoCreate } from "../service";
-import ProductoTable from "../components/ProductoTable";  // <-- singular
-import ProductoForm from "../components/ProductoForm";    // <-- singular
 import { Link } from "react-router-dom";
+import { productosList, productoCreate } from "../service";
+import ProductoForm from "../components/ProductoForm";
+import ProductoTable from "../components/ProductoTable";
 
+import "../../../styles/productos.css";
 
 export default function ProductosPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
 
   async function load() {
     setLoading(true);
     setError("");
+    setOk("");
     try {
       const data = await productosList();
-      setItems(data || []);
+      setItems(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError("No se pudieron cargar los productos.");
+      setError(e?.message || "No se pudieron cargar los productos.");
       console.error(e);
     } finally {
       setLoading(false);
@@ -30,13 +33,14 @@ export default function ProductosPage() {
   async function handleCreate(form) {
     setCreating(true);
     setError("");
+    setOk("");
     try {
       await productoCreate(form);
+      setOk("Producto guardado correctamente.");
       await load();
       return true;
     } catch (e) {
-      const msg = e?.message || "No se pudo crear el producto.";
-      setError(msg);
+      setError(e?.message || "No se pudo crear el producto.");
       return false;
     } finally {
       setCreating(false);
@@ -44,25 +48,33 @@ export default function ProductosPage() {
   }
 
   return (
-    <div style={{ maxWidth: 960, margin: "24px auto", padding: "0 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2>Productos</h2>
-        <Link to="/panel">← Volver al Panel</Link>
+    <div className="page page--productos">
+      <div className="page__head">
+        <h2>Inventario</h2>
+        <Link to="/panel" className="link-back">← Volver al Panel</Link>
       </div>
 
-      {error ? (
-        <div style={{ background: "#ffe8e8", border: "1px solid #ffb3b3", padding: 12, borderRadius: 8, marginBottom: 16 }}>
-          {error}
-        </div>
-      ) : null}
+      <section className="help">
+        <h3>¿Cómo registrar un medicamento?</h3>
+        <ol>
+          <li>Escribe <strong>Código</strong> y <strong>Nombre</strong> tal como los usas en la droguería.</li>
+          <li>Ingresa el <strong>Valor unitario</strong>. Con eso sugerimos <strong>Categoría ABC</strong> y <strong>ROP</strong>.</li>
+          <li>Si quieres, desactiva “Auto-sugerir” para ajustar manualmente la categoría o el ROP.</li>
+          <li>Guarda el producto. Lo verás en la tabla de abajo.</li>
+        </ol>
+        <p className="help__note">
+          * Estas sugerencias son temporales. Cuando carguemos ventas reales, el sistema
+          propondrá valores basados en tu historial (más preciso).
+        </p>
+      </section>
+
+      {error && <div className="alert alert--error">{error}</div>}
+      {ok && <div className="alert alert--ok">{ok}</div>}
 
       <ProductoForm onSubmit={handleCreate} submitting={creating} />
 
-      {loading ? (
-        <p>Cargando…</p>
-      ) : (
-        <ProductoTable items={items} />
-      )}
+      <h3 style={{ marginTop: 24 }}>Listado</h3>
+      {loading ? <p>Cargando…</p> : <ProductoTable items={items} />}
     </div>
   );
 }

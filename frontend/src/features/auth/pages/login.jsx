@@ -1,80 +1,45 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "../../../context/AuthContext";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../../../context/AuthContext";
 
-export default function LoginPage() {
-  const { login, token } = useAuth();
-  const navigate = useNavigate();
-
+export default function Login(){
+  const { login } = useAuth();
+  const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (token) navigate("/panel", { replace: true });
-  }, [token, navigate]);
-
-  async function onSubmit(e) {
+  async function onSubmit(e){
     e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
+    setError(""); setBusy(true);
+    try{
       await login({ email, password });
-      navigate("/panel", { replace: true });
-    } catch (err) {
-      setError(err?.message || "Credenciales inválidas");
-    } finally {
-      setLoading(false);
+      nav("/panel", { replace: true });
+    }catch(err){
+      setError(err?.payload?.detail || err?.message || "No se pudo iniciar sesión");
+    }finally{
+      setBusy(false);
     }
   }
 
   return (
-    <section className="max-w-md mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-4">Iniciar sesión</h1>
+    <div className="panel-wrap" style={{maxWidth:480}}>
+      <h2 className="panel-title">Iniciar sesión</h2>
+      {error && <div className="error">{error}</div>}
+      <form onSubmit={onSubmit} style={{display:"grid", gap:12}}>
+        <label>Correo</label>
+        <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
 
-      {error && <div className="mb-3 rounded bg-red-100 text-red-700 p-2">{error}</div>}
+        <label>Contraseña</label>
+        <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required />
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm mb-1">Correo</label>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-            autoComplete="email"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm mb-1">Contraseña</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-            autoComplete="current-password"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded bg-blue-600 text-white py-2 hover:bg-blue-700 disabled:opacity-60"
-        >
-          {loading ? "Entrando..." : "Entrar"}
+        <button className="nav__logout" type="submit" disabled={busy} style={{background:"#16a34a"}}>
+          {busy ? "Entrando…" : "Entrar"}
         </button>
       </form>
 
-      <p className="text-sm mt-4 text-center">
-        ¿No tienes cuenta?{" "}
-        <Link to="/register" className="text-blue-600 hover:underline">
-          Regístrate
-        </Link>
-      </p>
-    </section>
+      <p style={{marginTop:12}}>¿No tienes cuenta? <Link to="/register">Regístrate</Link></p>
+    </div>
   );
 }

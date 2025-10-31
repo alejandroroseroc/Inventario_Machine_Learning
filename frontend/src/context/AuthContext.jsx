@@ -1,57 +1,55 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { AuthService } from "../features/auth/service";
+import { http } from "../api/http";
 
-const AuthCtx = createContext(null);
+const Ctx = createContext(null);
+export const useAuth = () => useContext(Ctx);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => {
-    return localStorage.getItem("access") || localStorage.getItem("token") || null;
-  });
-  const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("user") || "null"); }
-    catch { return null; }
-  });
+  const [isAuth, setIsAuth] = useState(false);
+  const [ready, setReady]   = useState(false);
 
-  // Mantengo sincronía si otro tab cierra sesión
+  // Bootstrap: leer tokens al recargar
   useEffect(() => {
-    function onStorage(e) {
-      if (e.key === "access" || e.key === "token" || e.key === "user") {
-        setToken(localStorage.getItem("access") || localStorage.getItem("token") || null);
-        try { setUser(JSON.parse(localStorage.getItem("user") || "null")); }
-        catch { setUser(null); }
-      }
-    }
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    const t = localStorage.getItem("access");
+    setIsAuth(Boolean(t));
+    setReady(true);
   }, []);
 
-  async function register({ email, password }) {
-    return AuthService.register({ email, password });
+  function loginSuccess({ access, refresh }) {
+    if (access)  localStorage.setItem("access", access);
+    if (refresh) localStorage.setItem("refresh", refresh);
+    setIsAuth(true);
   }
 
   async function login({ email, password }) {
-    const s = await AuthService.login({ email, password });
-    setToken(s.token || s.access || localStorage.getItem("access"));
-    setUser(s.user || JSON.parse(localStorage.getItem("user") || "null"));
-    return s;
+    const data = await http.post("/auth/login", {
+      auth: false,
+      body: { email, password }
+    });
+    loginSuccess({ access: data?.access, refresh: data?.refresh });
+    return data;
+  }
+
+  async function register({ email, password }) {
+    const data = await http.post("/auth/register", {
+      auth: false,
+      body: { email, password }
+    });
+    // si tu backend ya devuelve tokens al registrar:
+    if (data?.access) loginSuccess({ access: data.access, refresh: data.refresh });
+    return data;
   }
 
   function logout() {
-    AuthService.logout();
-    setToken(null);
-    setUser(null);
+    try {
+      localStorage.removeItem("access");
+      localStorage.removeItem("refresh");
+      localStorage.removeItem("token");
+    } catch {}
+    setIsAuth(false);
   }
 
-  const value = useMemo(() => ({
-    token, user, isAuth: !!token,
-    register, login, logout
-  }), [token, user]);
+  const value = useMemo(() => ({ isAuth, ready, login, register, loginSuccess, logout }), [isAuth, ready]);
 
-  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthCtx);
-  if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");
-  return ctx;
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

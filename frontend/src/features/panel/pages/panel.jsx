@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getKpis } from "../api";
 import KpiCard from "../components/KpiCard";
 import RecentEvents from "../components/RecentEvents";
+import { Link } from "react-router-dom";
 
 function formatCurrency(valueStr){
   const n = Number(valueStr ?? 0);
@@ -43,6 +44,7 @@ export default function Panel(){
         <KpiCard title="Valor total inventario" value={formatCurrency(valor)} loading={loading}/>
         <KpiCard title="% productos críticos"   value={`${criticos}%`} loading={loading}/>
         <KpiCard title="Lotes por vencer (≤2m)" value={porVencer} loading={loading}/>
+        <Link to="/productos">Ir a Productos</Link>
       </div>
 
       <RecentEvents items={eventos} loading={loading}/>

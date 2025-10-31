@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import PrivateRoute from "./components/PrivateRoute";
+import ProductosPage from "./features/productos/pages/ProductosPage";
 
 import Register from "./features/auth/pages/register";
 import Login    from "./features/auth/pages/login";
@@ -17,6 +18,9 @@ export default function App(){
           <Route path="/register" element={<Register/>}/>
           <Route path="/login" element={<Login/>}/>
           <Route path="/panel" element={<PrivateRoute><Panel/></PrivateRoute>}/>
+          <Route path="/productos" element={<PrivateRoute><ProductosPage/></PrivateRoute>} />
+
+
           <Route path="*" element={<Login/>}/>
         </Routes>
       </BrowserRouter>

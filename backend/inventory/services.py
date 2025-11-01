@@ -18,7 +18,12 @@ from .repositories import (
     ingresos_por_producto,
     lotes_de_producto,
     crear_lote,
+    stock_total_producto,
+    alerta_stock_activa,
+    crear_alerta_stock,
+    resolver_alertas_stock,
 )
+
 
 def compute_kpis():
     valor = valor_total_inventario()
@@ -45,13 +50,42 @@ def compute_kpis():
         "transacciones_recientes": eventos,
     }
 
+def asegurar_alerta_stock(producto: Producto) -> bool:
+    """
+    Si stock_total < ROP -> deja alerta 'activa' (crea o actualiza mensaje).
+    Si stock_total >= ROP -> resuelve alertas activas.
+    Retorna True si queda alerta activa.
+    """
+    rop = int(producto.punto_reorden or 0)
+    stock = stock_total_producto(producto.id)
+
+    if stock < rop:
+        msg = f"Stock {stock} < ROP {rop} para {producto.codigo}"
+        al = alerta_stock_activa(producto.id)
+        if al:
+            if al.mensaje != msg:
+                al.mensaje = msg
+                al.save(update_fields=["mensaje"])
+        else:
+            crear_alerta_stock(producto.id, msg, "critico")
+        return True
+    else:
+        resolver_alertas_stock(producto.id)
+        return False
+
+
+def recalcular_alertas_stock_todas():
+    total = 0
+    for p in Producto.objects.all().only("id", "punto_reorden", "codigo"):
+        if asegurar_alerta_stock(p):
+            total += 1
+    return {"activos": total}
 
 ABC_CUTOFF_A = 0.80
 ABC_CUTOFF_B = 0.95
 ABC_WINDOW_DAYS = 30
 ROP_LEAD_TIME = 3
 ROP_BUFFER = 0.20
-
 
 def _calcular_rop(producto):
     dmd = demanda_media_diaria(producto, dias=ABC_WINDOW_DAYS)
@@ -165,6 +199,7 @@ def registrar_lote(payload: dict):
 class StockError(Exception):
     ...
 
+
 class MovimientoValidationError(Exception):
     ...
 
@@ -237,6 +272,7 @@ def registrar_movimiento(
             mov.motivo = motivo
             mov.save(update_fields=["motivo"])
         movimientos_creados.append(mov)
+        asegurar_alerta_stock(producto)
         return movimientos_creados
 
     if tipo == "salida":
@@ -247,7 +283,6 @@ def registrar_movimiento(
             lote.stock_lote = F("stock_lote") - int(cantidad)
             lote.save(update_fields=["stock_lote"])
             lote.refresh_from_db()
-
             mov = Movimiento.objects.create(
                 producto=producto,
                 lote=lote,
@@ -260,6 +295,7 @@ def registrar_movimiento(
                 mov.motivo = motivo
                 mov.save(update_fields=["motivo"])
             movimientos_creados.append(mov)
+            asegurar_alerta_stock(producto)
             return movimientos_creados
         else:
             por_descontar = int(cantidad)
@@ -289,7 +325,9 @@ def registrar_movimiento(
                     mov.save(update_fields=["motivo"])
                 movimientos_creados.append(mov)
                 por_descontar -= toma
+            asegurar_alerta_stock(producto)
             return movimientos_creados
+
     if tipo == "ajuste":
         qty = int(cantidad)
         if qty > 0:
@@ -304,7 +342,6 @@ def registrar_movimiento(
                 )
                 if not lote:
                     if not fecha_caducidad:
-                        # si no hay lotes y no hay fecha, usa +2 años como predeterminado
                         fecha_caducidad = date.today().replace(year=date.today().year + 2)
                     lote = Lote.objects.create(
                         producto=producto, fecha_caducidad=fecha_caducidad, stock_lote=0
@@ -325,6 +362,7 @@ def registrar_movimiento(
                 mov.motivo = motivo
                 mov.save(update_fields=["motivo"])
             movimientos_creados.append(mov)
+            asegurar_alerta_stock(producto)
             return movimientos_creados
         else:
             por_descontar = abs(qty)
@@ -348,6 +386,7 @@ def registrar_movimiento(
                     mov.motivo = motivo
                     mov.save(update_fields=["motivo"])
                 movimientos_creados.append(mov)
+                asegurar_alerta_stock(producto)
                 return movimientos_creados
             else:
                 lotes = list(
@@ -380,4 +419,5 @@ def registrar_movimiento(
                         mov.save(update_fields=["motivo"])
                     movimientos_creados.append(mov)
                     por_descontar -= toma
+                asegurar_alerta_stock(producto)
                 return movimientos_creados

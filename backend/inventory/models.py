@@ -25,3 +25,26 @@ class Movimiento(models.Model):
     tipo = models.CharField(max_length=10, choices=TIPO)
     cantidad = models.IntegerField()
     fecha_mov = models.DateTimeField(auto_now_add=True)
+
+# ====== NUEVO: modelo de alertas ======
+class Alerta(models.Model):
+    TIPO = (("stock", "stock"), ("caducidad", "caducidad"))
+    ESTADO = (("activa", "activa"), ("resuelta", "resuelta"))
+
+    tipo = models.CharField(max_length=20, choices=TIPO)
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name="alertas")
+    lote = models.ForeignKey(Lote, null=True, blank=True, on_delete=models.SET_NULL)
+    mensaje = models.CharField(max_length=255)
+    criticidad = models.CharField(max_length=10, default="critico")  # "critico" | "warning"
+    estado = models.CharField(max_length=10, choices=ESTADO, default="activa")
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["tipo", "estado"]),
+            models.Index(fields=["producto", "tipo", "estado"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.tipo}] {self.producto.codigo} - {self.estado}"

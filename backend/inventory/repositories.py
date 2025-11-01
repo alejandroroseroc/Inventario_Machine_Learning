@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 
-from .models import Producto, Lote, Movimiento
+from .models import Producto, Lote, Movimiento, Alerta
 
 def productos_con_stock_total():
     return Producto.objects.annotate(
@@ -36,17 +36,13 @@ def movimientos_recientes(n=3):
         .order_by("-fecha_mov")[:n]
     )
 
-# ====== NUEVO: soporte para ABC y ROP ======
-
 def _desde_hace(dias=30):
     hoy = timezone.now().date()
     return hoy - timedelta(days=dias)
 
 def ventas_cantidad_ultimos_dias(producto, dias=30):
     desde = _desde_hace(dias)
-    agg = (Movimiento.objects
-           .filter(producto=producto, tipo="salida", fecha_mov__date__gte=desde)
-           .aggregate(total=Coalesce(Sum("cantidad"), 0)))
+    agg = (Movimiento.objects.filter(producto=producto, tipo="salida", fecha_mov__date__gte=desde).aggregate(total=Coalesce(Sum("cantidad"), 0)))
     return int(agg["total"] or 0)
 
 def demanda_media_diaria(producto, dias=30):
@@ -75,3 +71,19 @@ def crear_lote(producto_id: int, fecha_caducidad, stock_lote: int):
         fecha_caducidad=fecha_caducidad,
         stock_lote=stock_lote,
     )
+    
+def stock_total_producto(producto_id: int) -> int:
+    return int(Lote.objects.filter(producto_id=producto_id).aggregate(s=Sum("stock_lote"))["s"] or 0)
+
+def alerta_stock_activa(producto_id: int):
+    return Alerta.objects.filter(producto_id=producto_id, tipo="stock", estado="activa").first()
+
+def crear_alerta_stock(producto_id: int, mensaje: str, criticidad: str = "critico"):
+    return Alerta.objects.create(
+        tipo="stock", producto_id=producto_id, mensaje=mensaje,
+        criticidad=criticidad, estado="activa"
+    )
+
+def resolver_alertas_stock(producto_id: int):
+    return Alerta.objects.filter(producto_id=producto_id, tipo="stock", estado="activa") \
+        .update(estado="resuelta")

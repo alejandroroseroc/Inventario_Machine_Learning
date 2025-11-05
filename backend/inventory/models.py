@@ -7,6 +7,7 @@ class Producto(models.Model):
     categoria = models.CharField(max_length=1, choices=[("A","A"),("B","B"),("C","C")], default="C")
     punto_reorden = models.IntegerField(default=0)
     valor_unitario = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    codigo_barras = models.CharField(max_length=32, blank=True, null=True) 
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
@@ -16,6 +17,8 @@ class Lote(models.Model):
     fecha_caducidad = models.DateField()
     stock_lote = models.IntegerField(default=0)
     fecha_ingreso = models.DateField(auto_now_add=True)
+    numero_lote = models.CharField(max_length=64, blank=True, null=True, db_index=True)  # ← NUEVO
+    codigo_barras = models.CharField(max_length=64, blank=True, null=True)
 
 class Movimiento(models.Model):
     TIPO = (("entrada","entrada"), ("salida","salida"), ("ajuste","ajuste"))

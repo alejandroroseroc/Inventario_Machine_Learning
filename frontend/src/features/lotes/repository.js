@@ -1,6 +1,5 @@
 // src/features/lotes/repository.js
 import { http } from "../../api/http";
-
 const BASE = "/inventory/lotes";
 
 export async function listLotesByProducto(productoId) {
@@ -8,7 +7,7 @@ export async function listLotesByProducto(productoId) {
 }
 
 export async function createLote(payload) {
-  // payload: { producto, fecha_caducidad, stock_lote }
+  // payload: { producto, fecha_caducidad, stock_lote, numero_lote?, codigo_barras? }
   return http.post(BASE, { body: payload, auth: true });
 }
 

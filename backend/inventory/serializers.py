@@ -6,7 +6,7 @@ from .models import Alerta
 class ProductoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Producto
-        fields = ("id", "codigo", "nombre", "categoria", "punto_reorden", "valor_unitario")
+        fields = ("id", "codigo", "nombre", "categoria", "punto_reorden", "valor_unitario","codigo_barras")
 
     def validate_punto_reorden(self, value):
         if value < 0:
@@ -22,7 +22,7 @@ class ProductoSerializer(serializers.ModelSerializer):
 class LoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lote
-        fields = ("id", "producto", "fecha_caducidad", "stock_lote", "fecha_ingreso")
+        fields = ("id", "producto", "fecha_caducidad", "stock_lote", "fecha_ingreso","codigo_barras")
 
     def validate_stock_lote(self, v):
         if v < 0:

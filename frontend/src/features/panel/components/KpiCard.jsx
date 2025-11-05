@@ -1,4 +1,5 @@
-export default function KpiCard({ title, value, subtitle, loading=false }){
+// src/features/panel/components/kpiCard.jsx
+export default function KpiCard({ title, value, subtitle, loading = false }) {
   return (
     <div className="kpi-card">
       <div className="kpi-title">{title}</div>

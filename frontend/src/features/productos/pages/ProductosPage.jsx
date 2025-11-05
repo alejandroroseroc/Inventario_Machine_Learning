@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { productosList, productoCreate } from "../service";
 import ProductoForm from "../components/ProductoForm";
 import ProductoTable from "../components/ProductoTable";
+import { productoCreate, productosList } from "../service";
 
 import "../../../styles/productos.css";
 
@@ -50,7 +50,7 @@ export default function ProductosPage() {
   return (
     <div className="page page--productos">
       <div className="page__head">
-        <h2>Inventario</h2>
+        <h2 className="page__title">Inventario</h2>
         <Link to="/panel" className="link-back">← Volver al Panel</Link>
       </div>
 
@@ -63,8 +63,7 @@ export default function ProductosPage() {
           <li>Guarda el producto. Lo verás en la tabla de abajo.</li>
         </ol>
         <p className="help__note">
-          * Estas sugerencias son temporales. Cuando carguemos ventas reales, el sistema
-          propondrá valores basados en tu historial (más preciso).
+          * Estas sugerencias son temporales. Cuando carguemos ventas reales, el sistema propondrá valores basados en tu historial.
         </p>
       </section>
 

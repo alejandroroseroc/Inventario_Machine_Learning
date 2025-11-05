@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { productoService } from "../service";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import "../../../styles/productos.css";
 import { lotesService } from "../../lotes/service";
 import { movimientosService } from "../../movimientos/service";
+import { productoService } from "../service";
 
 export default function ProductoDetailPage() {
   const { id } = useParams();
@@ -29,16 +30,16 @@ export default function ProductoDetailPage() {
 
   // ENTRADA RÁPIDA (auto-lote + escáner/teclado)
   const [entradaForm, setEntradaForm] = useState({
-    scan: "",                // aquí el lector escribe (o el usuario teclea el LOTE/código)
-    fecha_caducidad: "",     // obligatoria si el scan no trae caducidad
+    scan: "",
+    fecha_caducidad: "",
     cantidad: 0,
   });
 
   // Movimientos (salida/entrada/ajuste manual)
   const [movForm, setMovForm] = useState({
-    tipo: "salida",        // "entrada" | "salida" | "ajuste"
+    tipo: "salida",
     cantidad: 1,
-    lote_id: "",           // opcional; si vacío y es salida, el backend hace FEFO
+    lote_id: "",
   });
 
   useEffect(() => {
@@ -83,10 +84,7 @@ export default function ProductoDetailPage() {
     const { name, value } = e.target;
     setForm((s) => ({
       ...s,
-      [name]:
-        name === "valor_unitario" || name === "punto_reorden"
-          ? Number(value)
-          : value,
+      [name]: name === "valor_unitario" || name === "punto_reorden" ? Number(value) : value,
     }));
   };
 
@@ -107,7 +105,7 @@ export default function ProductoDetailPage() {
     setRemoving(true);
     try {
       await productoService.remove(id);
-      navigate("/productos"); // o "/inventario" según tu router
+      navigate("/productos");
     } catch {
       alert("No se pudo eliminar");
     } finally {
@@ -115,34 +113,17 @@ export default function ProductoDetailPage() {
     }
   };
 
-  /**
-   * Asegura un lote por (numero_lote) o (fecha_caducidad).
-   * - Si existe, devuelve su id.
-   * - Si no existe, intenta crearlo con numero_lote/codigo_barras;
-   *   si el backend no acepta esos campos, reintenta sin ellos.
-   */
-  const ensureLoteIdInline = async ({
-    numeroLote,
-    fechaCaducidad,
-    codigoBarras,
-  }) => {
-    // 1) buscar en los lotes actuales
+  // Crea o reutiliza lote (por número o caducidad)
+  const ensureLoteIdInline = async ({ numeroLote, fechaCaducidad, codigoBarras }) => {
     const current = await lotesService.listByProducto(id).catch(() => []);
     let found = null;
-    if (numeroLote) {
-      found = (current || []).find((l) => l.numero_lote === numeroLote);
-    }
+    if (numeroLote) found = (current || []).find((l) => l.numero_lote === numeroLote);
     if (!found && fechaCaducidad) {
       found = (current || []).find((l) => l.fecha_caducidad === fechaCaducidad);
     }
     if (found) return found.id;
 
-    // 2) crear: intento con campos extra (si el BE ya los tiene)
-    const basePayload = {
-      producto: Number(id),
-      fecha_caducidad: fechaCaducidad,
-      stock_lote: 0,
-    };
+    const basePayload = { producto: Number(id), fecha_caducidad: fechaCaducidad, stock_lote: 0 };
     try {
       const created = await lotesService.create({
         ...basePayload,
@@ -150,28 +131,16 @@ export default function ProductoDetailPage() {
         codigo_barras: codigoBarras || null,
       });
       return created.id;
-    } catch (e) {
-      // 3) si falla por campos desconocidos, reintenta sin ellos
-      try {
-        const created2 = await lotesService.create(basePayload);
-        return created2.id;
-      } catch (e2) {
-        throw e2;
-      }
+    } catch {
+      const created2 = await lotesService.create(basePayload);
+      return created2.id;
     }
   };
 
-  // ENTRADA RÁPIDA (auto-lote + escáner)
   const entradaRapida = async () => {
     const cantidad = Number(entradaForm.cantidad);
-    if (cantidad <= 0) {
-      alert("Cantidad > 0");
-      return;
-    }
-    if (!entradaForm.fecha_caducidad) {
-      alert("Indica la fecha de caducidad");
-      return;
-    }
+    if (cantidad <= 0) return alert("Cantidad > 0");
+    if (!entradaForm.fecha_caducidad) return alert("Indica la fecha de caducidad");
 
     try {
       const numeroLote = entradaForm.scan?.trim() || null;
@@ -198,10 +167,7 @@ export default function ProductoDetailPage() {
 
   const registrarMovimiento = async () => {
     const cantidad = Number(movForm.cantidad);
-    if (cantidad <= 0) {
-      alert("Cantidad debe ser > 0");
-      return;
-    }
+    if (cantidad <= 0) return alert("Cantidad debe ser > 0");
     try {
       await movimientosService.create({
         producto: Number(id),
@@ -216,133 +182,81 @@ export default function ProductoDetailPage() {
       setMovForm({ tipo: "salida", cantidad: 1, lote_id: "" });
     } catch (e) {
       console.error("Error mov:", e?.payload || e);
-      alert(
-        (e?.payload && (e.payload.detail || JSON.stringify(e.payload))) ||
-          "No se pudo registrar el movimiento"
-      );
+      alert((e?.payload && (e.payload.detail || JSON.stringify(e.payload))) || "No se pudo registrar el movimiento");
     }
   };
 
-  if (loading) return <div className="p-6">Cargando...</div>;
-  if (error) return <div className="p-6 text-red-600">{error}</div>;
-  if (!prod) return <div className="p-6">Producto no encontrado</div>;
+  if (loading) return <div className="page"><p>Cargando…</p></div>;
+  if (error) return <div className="page"><div className="alert alert--error">{error}</div></div>;
+  if (!prod) return <div className="page"><p>Producto no encontrado</p></div>;
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Producto #{id}</h1>
-        <div className="space-x-2">
-          <button
-            onClick={save}
-            disabled={saving}
-            className="px-3 py-2 rounded-md border"
-          >
+    <div className="page">
+      <div className="page__head">
+        <h2 className="page__title">Producto #{id}</h2>
+        <div className="actions">
+          <Link to="/productos" className="btn btn--ghost">← Volver</Link>
+          <button onClick={save} disabled={saving} className="btn btn--primary">
             {saving ? "Guardando..." : "Guardar cambios"}
           </button>
-          <button
-            onClick={remove}
-            disabled={removing}
-            className="px-3 py-2 rounded-md border text-red-600"
-          >
+          <button onClick={remove} disabled={removing} className="btn btn--danger">
             {removing ? "Eliminando..." : "Eliminar"}
           </button>
         </div>
       </div>
 
-      {/* Form edición */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <label className="space-y-1">
-          <span className="text-sm">Código</span>
-          <input
-            name="codigo"
-            value={form.codigo}
-            onChange={handleChange}
-            className="w-full border rounded-md px-3 py-2"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-sm">Nombre</span>
-          <input
-            name="nombre"
-            value={form.nombre}
-            onChange={handleChange}
-            className="w-full border rounded-md px-3 py-2"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-sm">Categoría ABC</span>
-          <select
-            name="categoria"
-            value={form.categoria}
-            onChange={handleChange}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-sm">Punto de reorden (ROP)</span>
-          <input
-            name="punto_reorden"
-            type="number"
-            value={form.punto_reorden}
-            onChange={handleChange}
-            className="w-full border rounded-md px-3 py-2"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-sm">Valor unitario</span>
-          <input
-            name="valor_unitario"
-            type="number"
-            value={form.valor_unitario}
-            onChange={handleChange}
-            className="w-full border rounded-md px-3 py-2"
-          />
-        </label>
+      {/* Edición del producto */}
+      <section className="card">
+        <div className="row row--2">
+          <div className="col">
+            <label>Código</label>
+            <input name="codigo" value={form.codigo} onChange={handleChange} />
+          </div>
+          <div className="col">
+            <label>Nombre</label>
+            <input name="nombre" value={form.nombre} onChange={handleChange} />
+          </div>
+          <div className="col">
+            <label>Categoría ABC</label>
+            <select name="categoria" value={form.categoria} onChange={handleChange}>
+              <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+            </select>
+          </div>
+          <div className="col">
+            <label>Punto de reorden (ROP)</label>
+            <input name="punto_reorden" type="number" value={form.punto_reorden} onChange={handleChange} />
+          </div>
+          <div className="col">
+            <label>Valor unitario</label>
+            <input name="valor_unitario" type="number" value={form.valor_unitario} onChange={handleChange} />
+          </div>
+        </div>
       </section>
 
-      {/* Forecast + Por vencer */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="border rounded-lg p-4">
-          <h2 className="font-medium mb-2">Pronóstico (próximo mes)</h2>
+      {/* Pronóstico y por vencer */}
+      <section className="row row--2">
+        <div className="card">
+          <h3>Pronóstico (próximo mes)</h3>
           {forecast ? (
-            <div>
-              <div className="text-3xl font-semibold">
-                {forecast.prediction_units}
-              </div>
-              <div className="text-sm text-gray-600">
-                Histórico mensual: {forecast.history_months} mes(es)
-              </div>
-            </div>
+            <>
+              <div className="kpi-big">{forecast.prediction_units}</div>
+              <div className="muted">Histórico mensual: {forecast.history_months} mes(es)</div>
+            </>
           ) : (
-            <div className="text-gray-600 text-sm">Sin datos suficientes</div>
+            <div className="muted">Sin datos suficientes</div>
           )}
         </div>
-        <div className="border rounded-lg p-4">
-          <h2 className="font-medium mb-2">Lotes por vencer (≤60 días)</h2>
+
+        <div className="card">
+          <h3>Lotes por vencer (≤60 días)</h3>
           {porVencer.length === 0 ? (
-            <div className="text-gray-600 text-sm">Sin lotes por vencer</div>
+            <div className="muted">Sin lotes por vencer</div>
           ) : (
-            <ul className="space-y-2">
+            <ul className="list">
               {porVencer.map((l) => (
-                <li
-                  key={l.lote_id}
-                  className="flex justify-between border rounded-md px-3 py-2"
-                >
-                  <span>
-                    #{l.lote_id} • Lote: {l.numero_lote || "-"} • caduca{" "}
-                    {l.fecha_caducidad} • stock {l.stock_lote}
-                  </span>
-                  <span
-                    className={
-                      l.days_left <= 30 ? "text-red-600" : "text-yellow-600"
-                    }
-                  >
-                    {l.days_left} días
-                  </span>
+                <li key={l.lote_id} className="list__row">
+                  <span>#{l.lote_id} • Lote: {l.numero_lote || "-"} • caduca {l.fecha_caducidad} • stock {l.stock_lote}</span>
+                  <span className={l.days_left <= 30 ? "text-danger" : "text-warn"}>{l.days_left} días</span>
                 </li>
               ))}
             </ul>
@@ -351,97 +265,58 @@ export default function ProductoDetailPage() {
       </section>
 
       {/* Lotes */}
-      <section className="border rounded-lg p-4 space-y-3">
-        <h2 className="font-medium">Lotes</h2>
-
-        {/* ENTRADA RÁPIDA (auto-lote + escáner) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <label className="space-y-1">
-            <span className="text-sm">Escanear / escribir LOTE</span>
+      <section className="card">
+        <h3>Lotes</h3>
+        <div className="row row--4">
+          <div className="col">
+            <label>Escanear / escribir LOTE</label>
             <input
-              autoFocus
               placeholder="Apunta el lector aquí"
               value={entradaForm.scan}
-              onChange={(e) =>
-                setEntradaForm((s) => ({ ...s, scan: e.target.value }))
-              }
-              className="w-full border rounded-md px-3 py-2"
+              onChange={(e) => setEntradaForm((s) => ({ ...s, scan: e.target.value }))}
             />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm">Fecha de caducidad</span>
+          </div>
+          <div className="col">
+            <label>Fecha de caducidad</label>
             <input
               type="date"
               value={entradaForm.fecha_caducidad}
-              onChange={(e) =>
-                setEntradaForm((s) => ({
-                  ...s,
-                  fecha_caducidad: e.target.value,
-                }))
-              }
-              className="w-full border rounded-md px-3 py-2"
+              onChange={(e) => setEntradaForm((s) => ({ ...s, fecha_caducidad: e.target.value }))}
               required
             />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm">Cantidad</span>
+          </div>
+          <div className="col">
+            <label>Cantidad</label>
             <input
-              type="number"
-              min={1}
+              type="number" min={1}
               value={entradaForm.cantidad}
-              onChange={(e) =>
-                setEntradaForm((s) => ({ ...s, cantidad: e.target.value }))
-              }
-              className="w-full border rounded-md px-3 py-2"
+              onChange={(e) => setEntradaForm((s) => ({ ...s, cantidad: e.target.value }))}
             />
-          </label>
-          <div className="flex items-end">
-            <button
-              onClick={entradaRapida}
-              className="px-3 py-2 rounded-md border w-full"
-            >
-              Agregar stock (auto-lote)
-            </button>
+          </div>
+          <div className="col col--auto" style={{alignSelf:"end"}}>
+            <button onClick={entradaRapida} className="btn">Agregar stock (auto-lote)</button>
           </div>
         </div>
 
-        {/* Tabla de lotes */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="table-wrap">
+          <table className="table">
             <thead>
-              <tr>
-                <th className="text-left py-2">ID</th>
-                <th className="text-left">Lote</th>
-                <th className="text-left">Caducidad</th>
-                <th className="text-left">Días</th>
-                <th className="text-left">Stock</th>
-              </tr>
+              <tr><th>ID</th><th>Lote</th><th>Caducidad</th><th>Días</th><th>Stock</th></tr>
             </thead>
             <tbody>
               {(lotes || [])
                 .slice()
-                .sort((a, b) =>
-                  String(a.fecha_caducidad).localeCompare(
-                    String(b.fecha_caducidad)
-                  )
-                )
+                .sort((a,b)=>String(a.fecha_caducidad).localeCompare(String(b.fecha_caducidad)))
                 .map((l) => {
                   const pv = (porVencer || []).find((x) => x.lote_id === l.id);
                   const days = pv?.days_left ?? "";
-                  const cls =
-                    days !== ""
-                      ? days <= 30
-                        ? "text-red-600"
-                        : days <= 60
-                        ? "text-yellow-600"
-                        : ""
-                      : "";
+                  const cls = days === "" ? "" : days <= 30 ? "text-danger" : days <= 60 ? "text-warn" : "";
                   return (
-                    <tr key={l.id} className="border-t">
-                      <td className="py-2">{l.id}</td>
+                    <tr key={l.id}>
+                      <td>{l.id}</td>
                       <td>{l.numero_lote || "-"}</td>
                       <td>{l.fecha_caducidad}</td>
-                      <td className={cls}>{days !== "" ? `${days}` : "-"}</td>
+                      <td className={cls}>{days !== "" ? days : "-"}</td>
                       <td>{l.stock_lote}</td>
                     </tr>
                   );
@@ -452,61 +327,35 @@ export default function ProductoDetailPage() {
       </section>
 
       {/* Movimientos */}
-      <section className="border rounded-lg p-4 space-y-3">
-        <h2 className="font-medium">Registrar movimiento</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <label className="space-y-1">
-            <span className="text-sm">Tipo</span>
-            <select
-              value={movForm.tipo}
-              onChange={(e) =>
-                setMovForm((s) => ({ ...s, tipo: e.target.value }))
-              }
-              className="w-full border rounded-md px-3 py-2"
-            >
+      <section className="card">
+        <h3>Registrar movimiento</h3>
+        <div className="row row--4">
+          <div className="col">
+            <label>Tipo</label>
+            <select value={movForm.tipo} onChange={(e) => setMovForm((s) => ({ ...s, tipo: e.target.value }))}>
               <option value="entrada">Entrada</option>
               <option value="salida">Salida</option>
               <option value="ajuste">Ajuste</option>
             </select>
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm">Cantidad</span>
-            <input
-              type="number"
-              value={movForm.cantidad}
-              onChange={(e) =>
-                setMovForm((s) => ({ ...s, cantidad: e.target.value }))
-              }
-              className="w-full border rounded-md px-3 py-2"
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm">Lote (opcional)</span>
+          </div>
+          <div className="col">
+            <label>Cantidad</label>
+            <input type="number" value={movForm.cantidad} onChange={(e) => setMovForm((s) => ({ ...s, cantidad: e.target.value }))}/>
+          </div>
+          <div className="col">
+            <label>Lote (opcional)</label>
             <input
               type="number"
               value={movForm.lote_id}
-              onChange={(e) =>
-                setMovForm((s) => ({ ...s, lote_id: e.target.value }))
-              }
-              className="w-full border rounded-md px-3 py-2"
+              onChange={(e) => setMovForm((s) => ({ ...s, lote_id: e.target.value }))}
               placeholder="FEFO si vacío"
             />
-          </label>
-          <div className="flex items-end">
-            <button
-              onClick={registrarMovimiento}
-              className="px-3 py-2 rounded-md border w-full"
-            >
-              Guardar movimiento
-            </button>
+          </div>
+          <div className="col col--auto" style={{alignSelf:"end"}}>
+            <button onClick={registrarMovimiento} className="btn btn--primary">Guardar movimiento</button>
           </div>
         </div>
-
-        <p className="text-xs text-gray-600">
-          Si dejas vacío el <b>lote</b> y el tipo es <b>salida</b>, el backend
-          asigna automáticamente el lote más próximo a vencer (FEFO).
-        </p>
+        <p className="muted">Si dejas vacío el <b>lote</b> y el tipo es <b>salida</b>, el backend asigna automáticamente el lote más próximo a vencer (FEFO).</p>
       </section>
     </div>
   );

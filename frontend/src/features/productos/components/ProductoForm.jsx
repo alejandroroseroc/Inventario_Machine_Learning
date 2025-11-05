@@ -17,33 +17,20 @@ export default function ProductoForm({ onSubmit, submitting }) {
     valor_unitario: 0,
   });
 
-  function update(k, v) {
-    setForm((s) => ({ ...s, [k]: v }));
-  }
+  function update(k, v) { setForm((s) => ({ ...s, [k]: v })); }
 
-  // === Sugerencias simples (solo front) ===
+  // Sugerencias front (heurística simple por precio)
   const sugeridos = useMemo(() => {
-    // Heurística: umbral por precio (rápido de explicar y ajustar).
     const vu = Number(form.valor_unitario || 0);
     let categoria = "C";
     if (vu >= 50000) categoria = "A";
     else if (vu >= 20000) categoria = "B";
-
-    // ROP por categoría (base, editable por el usuario).
     const ropByCat = { A: 20, B: 10, C: 5 };
-    const rop = ropByCat[categoria];
-
-    return { categoria, rop };
+    return { categoria, rop: ropByCat[categoria] };
   }, [form.valor_unitario]);
 
   useEffect(() => {
-    if (auto) {
-      setForm((s) => ({
-        ...s,
-        categoria: sugeridos.categoria,
-        punto_reorden: sugeridos.rop,
-      }));
-    }
+    if (auto) setForm((s) => ({ ...s, categoria: sugeridos.categoria, punto_reorden: sugeridos.rop }));
   }, [auto, sugeridos.categoria, sugeridos.rop]);
 
   async function handleSubmit(e) {
@@ -91,62 +78,33 @@ export default function ProductoForm({ onSubmit, submitting }) {
           <div className="row row--tight">
             <div className="col">
               <label>Categoría ABC</label>
-              <select
-                value={form.categoria}
-                onChange={(e) => update("categoria", e.target.value)}
-                disabled={auto}
-              >
-                {CATS.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
+              <select value={form.categoria} onChange={(e) => update("categoria", e.target.value)} disabled={auto}>
+                {CATS.map((c) => (<option key={c.value} value={c.value}>{c.label}</option>))}
               </select>
             </div>
             <div className="col col--auto">
               <label className="label--tiny">Auto-sugerir</label>
               <div className="switch">
-                <input
-                  type="checkbox"
-                  id="autoABC"
-                  checked={auto}
-                  onChange={(e) => setAuto(e.target.checked)}
-                />
+                <input type="checkbox" id="autoABC" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
                 <label htmlFor="autoABC">ABC/ROP</label>
               </div>
             </div>
           </div>
           <small className="hint">
-            <strong>¿Qué es ABC?</strong> A = más importantes/rotación alta, B = media, C = baja.
-            Hoy se sugiere por precio y podrás ajustarlo.
+            <strong>¿Qué es ABC?</strong> A = más importantes/rotación alta, B = media, C = baja. Hoy se sugiere por precio y podrás ajustarlo.
           </small>
         </div>
 
         <div className="col">
           <label>Punto de reorden (unidades)</label>
-          <input
-            type="number"
-            min={0}
-            value={form.punto_reorden}
-            onChange={(e) => update("punto_reorden", e.target.value)}
-            disabled={auto}
-          />
-          <small className="hint">
-            Cantidad mínima para volver a pedir. Mientras no haya historial,
-            sugerimos A=20, B=10, C=5 (editable).
-          </small>
+          <input type="number" min={0} value={form.punto_reorden} onChange={(e) => update("punto_reorden", e.target.value)} disabled={auto} />
+          <small className="hint">Mientras no haya historial, sugerimos A=20, B=10, C=5 (editable).</small>
         </div>
 
         <div className="col">
           <label>Valor unitario (COP)</label>
-          <input
-            type="number"
-            step="0.01"
-            min={0}
-            value={form.valor_unitario}
-            onChange={(e) => update("valor_unitario", e.target.value)}
-          />
-          <small className="hint">
-            Usado para sugerir la categoría inicial. Luego podremos basarnos en ventas reales.
-          </small>
+          <input type="number" step="0.01" min={0} value={form.valor_unitario} onChange={(e) => update("valor_unitario", e.target.value)} />
+          <small className="hint">Usado para sugerir la categoría inicial.</small>
         </div>
       </div>
 

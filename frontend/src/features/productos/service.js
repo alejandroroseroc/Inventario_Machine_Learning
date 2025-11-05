@@ -1,5 +1,11 @@
 // src/features/productos/service.js
 import { repoGetProductos, repoCreateProducto } from "./repository";
+import {
+  getProductoById,
+  updateProducto,
+  deleteProducto,
+  getProductoForecast,
+} from "./repository";
 
 export async function productosList() {
   const data = await repoGetProductos();
@@ -23,3 +29,10 @@ export async function productoCreate(dto) {
   const created = await repoCreateProducto(payload);
   return created;
 }
+export const productoService = {
+  // conservar tus métodos existentes (list, create, etc.)
+  getById: getProductoById,
+  update: updateProducto,
+  remove: deleteProducto,
+  forecast: getProductoForecast,
+};

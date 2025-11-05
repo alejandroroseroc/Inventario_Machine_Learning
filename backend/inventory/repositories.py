@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from multiprocessing import Value
 from django.utils import timezone
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 from django.db.models.functions import Coalesce
@@ -52,11 +53,27 @@ def demanda_media_diaria(producto, dias=30):
 def ingresos_por_producto(dias=30):
     """ Dict {producto_id: ingresos_30d} """
     desde = _desde_hace(dias)
-    rows = (Movimiento.objects
-            .filter(tipo="salida", fecha_mov__date__gte=desde)
-            .values("producto_id")
-            .annotate(total=Coalesce(Sum(F("cantidad") * F("producto__valor_unitario")), 0)))
+
+    # Tipar la multiplicación a Decimal
+    amount = ExpressionWrapper(
+        F("cantidad") * F("producto__valor_unitario"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+
+    rows = (
+        Movimiento.objects
+        .filter(tipo="salida", fecha_mov__date__gte=desde)
+        .values("producto_id")
+        .annotate(
+            total=Coalesce(
+                Sum(amount),
+                Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            )
+        )
+    )
+
     return {r["producto_id"]: r["total"] for r in rows}
+
 
 def lotes_de_producto(producto_id: int):
     return (

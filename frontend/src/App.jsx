@@ -1,29 +1,54 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
-import PrivateRoute from "./components/PrivateRoute";
-import Navbar from "./components/Navbar";
+// src/App.jsx
+import { Routes, Route, Navigate } from "react-router-dom";
+import PrivateRoute from "./components/PrivateRoute.jsx";
 
-import Register from "./features/auth/pages/register";
-import Login    from "./features/auth/pages/login";
-import Panel    from "./features/panel/pages/panel";
-import ProductosPage from "./features/productos/pages/ProductosPage";
+// Páginas existentes en tu ZIP
+import PanelPage from "./features/panel/pages/panel.jsx";
+import ProductosPage from "./features/productos/pages/ProductosPage.jsx";
+import LoginPage from "./features/auth/pages/login.jsx";
+import RegisterPage from "./features/auth/pages/register.jsx";
 
-import "./styles/panel.css";
+// NUEVA página de detalle (puede ser el stub por ahora)
+import ProductoDetailPage from "./features/productos/pages/ProductoDetailPage.jsx";
 
-export default function App(){
+export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Navbar />
-        <Routes>
-          <Route path="/"          element={<PrivateRoute><Panel/></PrivateRoute>} />
-          <Route path="/panel"     element={<PrivateRoute><Panel/></PrivateRoute>} />
-          <Route path="/productos" element={<PrivateRoute><ProductosPage/></PrivateRoute>} />
-          <Route path="/login"     element={<Login/>}/>
-          <Route path="/register"  element={<Register/>}/>
-          <Route path="*"          element={<Login/>}/>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <Routes>
+      {/* Redirige / a /panel si ya hay sesión */}
+      <Route path="/" element={<Navigate to="/panel" replace />} />
+
+      {/* Públicas */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+
+      {/* Protegidas */}
+      <Route
+        path="/panel"
+        element={
+          <PrivateRoute>
+            <PanelPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/productos"
+        element={
+          <PrivateRoute>
+            <ProductosPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/productos/:id"
+        element={
+          <PrivateRoute>
+            <ProductoDetailPage />
+          </PrivateRoute>
+        }
+      />
+
+      {/* 404 */}
+      <Route path="*" element={<div style={{ padding: 24 }}>404</div>} />
+    </Routes>
   );
 }

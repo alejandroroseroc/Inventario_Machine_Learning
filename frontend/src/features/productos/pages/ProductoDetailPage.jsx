@@ -4,6 +4,7 @@ import "../../../styles/productos.css";
 import { lotesService } from "../../lotes/service";
 import { movimientosService } from "../../movimientos/service";
 import { productoService } from "../service";
+import { sugerirRop, patchProducto } from "../repository";
 
 export default function ProductoDetailPage() {
   const { id } = useParams();
@@ -18,6 +19,14 @@ export default function ProductoDetailPage() {
   const [forecast, setForecast] = useState(null);
   const [lotes, setLotes] = useState([]);
   const [porVencer, setPorVencer] = useState([]);
+
+  // ROP (modo y parámetros)
+  const [ropModo, setRopModo] = useState("manual"); // 'manual' | 'auto'
+  const [leadTime, setLeadTime] = useState(5);
+  const [lookback, setLookback] = useState(90);
+  const [ss, setSs] = useState(0);
+  const [sugerencia, setSugerencia] = useState(null);
+  const [calculando, setCalculando] = useState(false);
 
   // formulario de edición del producto
   const [form, setForm] = useState({
@@ -165,6 +174,35 @@ export default function ProductoDetailPage() {
     }
   };
 
+  // ====== ROP: cálculo sugerido y aplicar ======
+  async function calcularSugerencia() {
+    if (!prod?.id) return;
+    setCalculando(true);
+    try {
+      const data = await sugerirRop(prod.id, { lookback, lead_time: leadTime, ss });
+      setSugerencia(data);
+    } catch (e) {
+      alert("No se pudo calcular el ROP sugerido.");
+      setSugerencia(null);
+    } finally {
+      setCalculando(false);
+    }
+  }
+
+  async function usarRopSugerido() {
+    if (!sugerencia?.sugerido_rop || !prod?.id) return;
+    const nuevo = Number(sugerencia.sugerido_rop);
+    try {
+      const updated = await patchProducto(prod.id, { punto_reorden: nuevo });
+      // actualiza estados locales
+      setProd(updated || { ...prod, punto_reorden: nuevo });
+      setForm((s) => ({ ...s, punto_reorden: nuevo }));
+      alert(`Punto de reorden actualizado a ${nuevo}.`);
+    } catch {
+      alert("No se pudo actualizar el punto de reorden.");
+    }
+  }
+
   const registrarMovimiento = async () => {
     const cantidad = Number(movForm.cantidad);
     if (cantidad <= 0) return alert("Cantidad debe ser > 0");
@@ -182,7 +220,10 @@ export default function ProductoDetailPage() {
       setMovForm({ tipo: "salida", cantidad: 1, lote_id: "" });
     } catch (e) {
       console.error("Error mov:", e?.payload || e);
-      alert((e?.payload && (e.payload.detail || JSON.stringify(e.payload))) || "No se pudo registrar el movimiento");
+      alert(
+        (e?.payload && (e.payload.detail || JSON.stringify(e.payload))) ||
+          "No se pudo registrar el movimiento"
+      );
     }
   };
 
@@ -231,6 +272,139 @@ export default function ProductoDetailPage() {
             <input name="valor_unitario" type="number" value={form.valor_unitario} onChange={handleChange} />
           </div>
         </div>
+      </section>
+
+      {/* ====== ROP – versión humanizada ====== */}
+      <section className="card" style={{ marginTop: 12 }}>
+        <h3 style={{ marginTop: 0 }}>Punto de reorden (ROP)</h3>
+
+        {/* Explicación corta y clara */}
+        <p className="help__note" style={{ marginBottom: 8 }}>
+          El <b>punto de reorden</b> es el nivel de stock al que quiero que el sistema me avise para hacer pedido.
+          Puedes definirlo <b>manualmente</b> o dejar que el sistema te dé una <b>sugerencia automática</b>
+          usando tu historial de ventas y el tiempo que tarda en llegar un pedido.
+        </p>
+
+        {/* Selector de modo */}
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="radio"
+              name="rop-modo"
+              checked={ropModo === "manual"}
+              onChange={() => setRopModo("manual")}
+            />
+            <span>Definirlo yo (manual)</span>
+          </label>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="radio"
+              name="rop-modo"
+              checked={ropModo === "auto"}
+              onChange={() => setRopModo("auto")}
+            />
+            <span>Que el sistema me lo sugiera (automático)</span>
+          </label>
+        </div>
+
+        {/* Modo Manual: explicación (el input real ya está arriba en tu formulario) */}
+        {ropModo === "manual" && (
+          <p className="help__note">
+            Si elijo <b>manual</b>, solo escribo el número en <b>Punto de reorden (ROP)</b> del formulario de arriba.
+            <br />
+            <i>Ejemplo:</i> si pongo <b>5</b>, cuando el stock total llegue a <b>5</b> o menos veré una <b>alerta</b> y el
+            producto contará como <b>crítico</b> en el panel.
+          </p>
+        )}
+
+        {/* Modo Automático */}
+        {ropModo === "auto" && (
+          <div>
+            <p className="help__note" style={{ marginBottom: 8 }}>
+              <b>Cálculo sugerido:</b> <code>ROP = promedio que vendo al día × días que tarda en llegar el pedido + colchón</code>.
+              <br />
+              ¿Qué pongo en cada casilla?
+              <br />• <b>Período a revisar</b>: de cuántos días atrás tomar el promedio de ventas (p. ej. <b>90</b>).
+              <br />• <b>Días para que llegue un pedido</b>: lo que normalmente tarda el proveedor (p. ej. <b>5</b>).
+              <br />• <b>Colchón de seguridad</b>: unidades extra “por si acaso” (p. ej. <b>10</b>).
+            </p>
+
+            <div
+              style={{
+                display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                marginBottom: 10,
+              }}
+            >
+              <label>
+                <div className="text-sm">Período a revisar (días)</div>
+                <input
+                  type="number"
+                  min={7}
+                  value={lookback}
+                  onChange={(e) => setLookback(Number(e.target.value) || 0)}
+                  placeholder="Ej: 90"
+                />
+                <small className="help__note">Se usa para calcular tu promedio vendido por día.</small>
+              </label>
+
+              <label>
+                <div className="text-sm">Días para que llegue un pedido</div>
+                <input
+                  type="number"
+                  min={0}
+                  value={leadTime}
+                  onChange={(e) => setLeadTime(Number(e.target.value) || 0)}
+                  placeholder="Ej: 5"
+                />
+                <small className="help__note">Tiempo típico entre pedir y recibir.</small>
+              </label>
+
+              <label>
+                <div className="text-sm">Colchón de seguridad (unidades)</div>
+                <input
+                  type="number"
+                  min={0}
+                  value={ss}
+                  onChange={(e) => setSs(Number(e.target.value) || 0)}
+                  placeholder="Ej: 10"
+                />
+                <small className="help__note">Unidades extra para cubrir imprevistos.</small>
+              </label>
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={calcularSugerencia} disabled={calculando}>
+                {calculando ? "Calculando..." : "Calcular punto de reorden sugerido"}
+              </button>
+
+              {!!sugerencia?.sugerido_rop && (
+                <button onClick={usarRopSugerido}>
+                  Usar este valor ({sugerencia.sugerido_rop})
+                </button>
+              )}
+            </div>
+
+            {sugerencia && (
+              <div className="help" style={{ marginTop: 10 }}>
+                <div><b>Resultado del cálculo</b></div>
+                <div>Promedio vendido por día: {sugerencia.promedio_diario}</div>
+                <div>Días para que llegue un pedido: {sugerencia.lead_time_dias} d</div>
+                <div>Colchón de seguridad: {sugerencia.stock_seguridad}</div>
+                <div>Punto de reorden sugerido: <b>{sugerencia.sugerido_rop}</b></div>
+                <div className="help__note">
+                  {sugerencia.formula}. {sugerencia.nota}
+                </div>
+                <div className="help__note">
+                  <i>Ejemplo ilustrativo:</i> si vendes <b>3</b> al día, el pedido tarda <b>5</b> días y quieres <b>10</b> de colchón,
+                  entonces ROP = 3 × 5 + 10 = <b>25</b>. El sistema te avisará cuando el stock llegue a 25 o menos.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Pronóstico y por vencer */}
@@ -293,7 +467,7 @@ export default function ProductoDetailPage() {
               onChange={(e) => setEntradaForm((s) => ({ ...s, cantidad: e.target.value }))}
             />
           </div>
-          <div className="col col--auto" style={{alignSelf:"end"}}>
+          <div className="col col--auto" style={{ alignSelf: "end" }}>
             <button onClick={entradaRapida} className="btn">Agregar stock (auto-lote)</button>
           </div>
         </div>
@@ -306,7 +480,7 @@ export default function ProductoDetailPage() {
             <tbody>
               {(lotes || [])
                 .slice()
-                .sort((a,b)=>String(a.fecha_caducidad).localeCompare(String(b.fecha_caducidad)))
+                .sort((a, b) => String(a.fecha_caducidad).localeCompare(String(b.fecha_caducidad)))
                 .map((l) => {
                   const pv = (porVencer || []).find((x) => x.lote_id === l.id);
                   const days = pv?.days_left ?? "";
@@ -340,7 +514,7 @@ export default function ProductoDetailPage() {
           </div>
           <div className="col">
             <label>Cantidad</label>
-            <input type="number" value={movForm.cantidad} onChange={(e) => setMovForm((s) => ({ ...s, cantidad: e.target.value }))}/>
+            <input type="number" value={movForm.cantidad} onChange={(e) => setMovForm((s) => ({ ...s, cantidad: e.target.value }))} />
           </div>
           <div className="col">
             <label>Lote (opcional)</label>
@@ -351,7 +525,7 @@ export default function ProductoDetailPage() {
               placeholder="FEFO si vacío"
             />
           </div>
-          <div className="col col--auto" style={{alignSelf:"end"}}>
+          <div className="col col--auto" style={{ alignSelf: "end" }}>
             <button onClick={registrarMovimiento} className="btn btn--primary">Guardar movimiento</button>
           </div>
         </div>

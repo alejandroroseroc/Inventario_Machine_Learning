@@ -1,59 +1,34 @@
-// src/App.jsx
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import Navbar from "./components/Navbar.jsx";
-import PrivateRoute from "./components/PrivateRoute.jsx";
+import { Routes, Route } from "react-router-dom";
+import Navbar from "./components/Navbar";
+import PrivateRoute from "./components/PrivateRoute";
 
-// Páginas
-import LoginPage from "./features/auth/pages/login.jsx";
-import RegisterPage from "./features/auth/pages/register.jsx";
-import PanelPage from "./features/panel/pages/panel.jsx";
+import Register from "./features/auth/pages/register";
+import Login from "./features/auth/pages/login";
+import Panel from "./features/panel/pages/panel";
+import ProductosPage from "./features/productos/pages/ProductosPage";
 import ProductoDetailPage from "./features/productos/pages/ProductoDetailPage.jsx";
-import ProductosPage from "./features/productos/pages/ProductosPage.jsx";
+import RegistrarVentaPage from "./features/ventas/pages/RegistrarVentaPage.jsx";
+
+import "./styles/panel.css";
 
 export default function App() {
-  const { pathname } = useLocation();
-  const hideNav = pathname.startsWith("/login") || pathname.startsWith("/register");
-
   return (
     <>
-      {/* La Navbar aparece en todo el sitio, excepto en login/register */}
-      {!hideNav && <Navbar />}
-
+      <Navbar />
       <Routes>
-        <Route path="/" element={<Navigate to="/panel" replace />} />
+        {/* públicas */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-        {/* Públicas */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        {/* privadas */}
+        <Route path="/" element={<PrivateRoute><Panel /></PrivateRoute>} />
+        <Route path="/panel" element={<PrivateRoute><Panel /></PrivateRoute>} />
+        <Route path="/productos" element={<PrivateRoute><ProductosPage /></PrivateRoute>} />
+        <Route path="/productos/:id" element={<PrivateRoute><ProductoDetailPage /></PrivateRoute>} />
+        <Route path="/ventas" element={<PrivateRoute><RegistrarVentaPage /></PrivateRoute>} />
 
-        {/* Protegidas */}
-        <Route
-          path="/panel"
-          element={
-            <PrivateRoute>
-              <PanelPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/productos"
-          element={
-            <PrivateRoute>
-              <ProductosPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/productos/:id"
-          element={
-            <PrivateRoute>
-              <ProductoDetailPage />
-            </PrivateRoute>
-          }
-        />
-
-        {/* 404 */}
-        <Route path="*" element={<div style={{ padding: 24 }}>404</div>} />
+        {/* fallback */}
+        <Route path="*" element={<Login />} />
       </Routes>
     </>
   );

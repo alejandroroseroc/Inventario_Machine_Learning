@@ -20,9 +20,10 @@ class ProductoSerializer(serializers.ModelSerializer):
 
 
 class LoteSerializer(serializers.ModelSerializer):
+    producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
     class Meta:
         model = Lote
-        fields = ("id", "producto", "fecha_caducidad", "stock_lote", "fecha_ingreso","codigo_barras")
+        fields = ("id", "producto", "producto_nombre", "fecha_caducidad", "stock_lote", "fecha_ingreso","codigo_barras")
 
     def validate_stock_lote(self, v):
         if v < 0:

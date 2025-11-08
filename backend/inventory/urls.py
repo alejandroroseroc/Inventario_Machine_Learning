@@ -5,7 +5,7 @@ from .views_products import (
     ProductoListCreateView,
     RecalcularProductosView,
     ProductoDetailView,
-    ProductoForecastView,
+    ProductoForecastView, ProductoRopSugerirView,
 )
 from .views_lotes import (
     LoteListCreateView,
@@ -34,6 +34,8 @@ urlpatterns = [
     path("inventory/lotes", LoteListCreateView.as_view(), name="lotes-list-create"),
     path("inventory/lotes/por-vencer", LotesPorVencerView.as_view(), name="lotes-por-vencer"),
 
+    path("inventory/productos/<int:pk>/forecast", ProductoForecastView.as_view(), name="producto-forecast"),
+    path("inventory/productos/<int:pk>/rop_sugerir", ProductoRopSugerirView.as_view(), name="producto-rop-sugerir"),
     # Movimientos
     path("inventory/movimientos", MovimientoListCreateView.as_view(), name="movimientos-list-create"),
 

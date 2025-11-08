@@ -19,7 +19,6 @@ export default function ProductoForm({ onSubmit, submitting }) {
 
   function update(k, v) { setForm((s) => ({ ...s, [k]: v })); }
 
-  // Sugerencias front (heurística simple por precio)
   const sugeridos = useMemo(() => {
     const vu = Number(form.valor_unitario || 0);
     let categoria = "C";
@@ -58,18 +57,30 @@ export default function ProductoForm({ onSubmit, submitting }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card">
+    <form onSubmit={handleSubmit} className="card" aria-labelledby="pf_title">
       <div className="row">
         <div className="col">
-          <label>Código</label>
-          <input value={form.codigo} onChange={(e) => update("codigo", e.target.value)} required />
-          <small className="hint">Usa el código del proveedor o interno de la droguería.</small>
+          <label htmlFor="pf_codigo">Código</label>
+          <input
+            id="pf_codigo"
+            value={form.codigo}
+            onChange={(e) => update("codigo", e.target.value)}
+            required
+            aria-describedby="pf_codigo_hint"
+          />
+          <small id="pf_codigo_hint" className="hint">Usa el código del proveedor o interno de la droguería.</small>
         </div>
 
         <div className="col">
-          <label>Nombre</label>
-          <input value={form.nombre} onChange={(e) => update("nombre", e.target.value)} required />
-          <small className="hint">Nombre comercial o genérico que usas en el mostrador.</small>
+          <label htmlFor="pf_nombre">Nombre</label>
+          <input
+            id="pf_nombre"
+            value={form.nombre}
+            onChange={(e) => update("nombre", e.target.value)}
+            required
+            aria-describedby="pf_nombre_hint"
+          />
+          <small id="pf_nombre_hint" className="hint">Nombre comercial o genérico que usas en el mostrador.</small>
         </div>
       </div>
 
@@ -77,34 +88,55 @@ export default function ProductoForm({ onSubmit, submitting }) {
         <div className="col">
           <div className="row row--tight">
             <div className="col">
-              <label>Categoría ABC</label>
-              <select value={form.categoria} onChange={(e) => update("categoria", e.target.value)} disabled={auto}>
+              <label htmlFor="pf_categoria">Categoría ABC</label>
+              <select
+                id="pf_categoria"
+                value={form.categoria}
+                onChange={(e) => update("categoria", e.target.value)}
+                disabled={auto}
+              >
                 {CATS.map((c) => (<option key={c.value} value={c.value}>{c.label}</option>))}
               </select>
             </div>
             <div className="col col--auto">
-              <label className="label--tiny">Auto-sugerir</label>
-              <div className="switch">
+              <span className="label--tiny" id="pf_auto_label">Auto-sugerir</span>
+              <div className="switch" role="group" aria-labelledby="pf_auto_label">
                 <input type="checkbox" id="autoABC" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
                 <label htmlFor="autoABC">ABC/ROP</label>
               </div>
             </div>
           </div>
-          <small className="hint">
+          <small className="hint" id="pf_abc_hint">
             <strong>¿Qué es ABC?</strong> A = más importantes/rotación alta, B = media, C = baja. Hoy se sugiere por precio y podrás ajustarlo.
           </small>
         </div>
 
         <div className="col">
-          <label>Punto de reorden (unidades)</label>
-          <input type="number" min={0} value={form.punto_reorden} onChange={(e) => update("punto_reorden", e.target.value)} disabled={auto} />
-          <small className="hint">Mientras no haya historial, sugerimos A=20, B=10, C=5 (editable).</small>
+          <label htmlFor="pf_rop">Punto de reorden (unidades)</label>
+          <input
+            id="pf_rop"
+            type="number"
+            min={0}
+            value={form.punto_reorden}
+            onChange={(e) => update("punto_reorden", e.target.value)}
+            disabled={auto}
+            aria-describedby="pf_rop_hint"
+          />
+          <small id="pf_rop_hint" className="hint">Mientras no haya historial, sugerimos A=20, B=10, C=5 (editable).</small>
         </div>
 
         <div className="col">
-          <label>Valor unitario (COP)</label>
-          <input type="number" step="0.01" min={0} value={form.valor_unitario} onChange={(e) => update("valor_unitario", e.target.value)} />
-          <small className="hint">Usado para sugerir la categoría inicial.</small>
+          <label htmlFor="pf_valor">Valor unitario (COP)</label>
+          <input
+            id="pf_valor"
+            type="number"
+            step="0.01"
+            min={0}
+            value={form.valor_unitario}
+            onChange={(e) => update("valor_unitario", e.target.value)}
+            aria-describedby="pf_valor_hint"
+          />
+          <small id="pf_valor_hint" className="hint">Usado para sugerir la categoría inicial.</small>
         </div>
       </div>
 

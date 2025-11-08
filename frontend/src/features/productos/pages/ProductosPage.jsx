@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import "../../../styles/productos.css";
 import ProductoForm from "../components/ProductoForm";
 import ProductoTable from "../components/ProductoTable";
 import { productoCreate, productosList } from "../service";
-
-import "../../../styles/productos.css";
 
 export default function ProductosPage() {
   const [items, setItems] = useState([]);
@@ -14,48 +13,29 @@ export default function ProductosPage() {
   const [ok, setOk] = useState("");
 
   async function load() {
-    setLoading(true);
-    setError("");
-    setOk("");
-    try {
-      const data = await productosList();
-      setItems(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setError(e?.message || "No se pudieron cargar los productos.");
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setError(""); setOk("");
+    try { const data = await productosList(); setItems(Array.isArray(data) ? data : []); }
+    catch (e) { setError(e?.message || "No se pudieron cargar los productos."); console.error(e); }
+    finally { setLoading(false); }
   }
-
   useEffect(() => { load(); }, []);
 
   async function handleCreate(form) {
-    setCreating(true);
-    setError("");
-    setOk("");
-    try {
-      await productoCreate(form);
-      setOk("Producto guardado correctamente.");
-      await load();
-      return true;
-    } catch (e) {
-      setError(e?.message || "No se pudo crear el producto.");
-      return false;
-    } finally {
-      setCreating(false);
-    }
+    setCreating(true); setError(""); setOk("");
+    try { await productoCreate(form); setOk("Producto guardado correctamente."); await load(); return true; }
+    catch (e) { setError(e?.message || "No se pudo crear el producto."); return false; }
+    finally { setCreating(false); }
   }
 
   return (
     <div className="page page--productos">
       <div className="page__head">
-        <h2 className="page__title">Inventario</h2>
+        <h2 className="page__title" id="pf_title">Inventario</h2>
         <Link to="/panel" className="link-back">← Volver al Panel</Link>
       </div>
 
-      <section className="help">
-        <h3>¿Cómo registrar un medicamento?</h3>
+      <section className="help" aria-labelledby="ayuda_inv_titulo">
+        <h3 id="ayuda_inv_titulo">¿Cómo registrar un medicamento?</h3>
         <ol>
           <li>Escribe <strong>Código</strong> y <strong>Nombre</strong> tal como los usas en la droguería.</li>
           <li>Ingresa el <strong>Valor unitario</strong>. Con eso sugerimos <strong>Categoría ABC</strong> y <strong>ROP</strong>.</li>
@@ -67,8 +47,8 @@ export default function ProductosPage() {
         </p>
       </section>
 
-      {error && <div className="alert alert--error">{error}</div>}
-      {ok && <div className="alert alert--ok">{ok}</div>}
+      {error && <div className="alert alert--error" role="alert">{error}</div>}
+      {ok && <div className="alert alert--ok" role="status">{ok}</div>}
 
       <ProductoForm onSubmit={handleCreate} submitting={creating} />
 

@@ -1,4 +1,3 @@
-// src/api/http.js
 const API = import.meta.env.VITE_API_URL; // ej: http://127.0.0.1:8000/api
 
 function getAccess() {
@@ -41,7 +40,7 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
 
   let res = await doFetch(method, path, body, headers);
 
-  // Si expira o llega inválido, intenta refresh (si hay refresh guardado)
+  // Reintento con refresh si el token expira
   if (auth && res.status === 401 && getRefresh()) {
     try {
       const r = await doFetch("POST", "/auth/refresh", { refresh: getRefresh() }, { "Content-Type": "application/json" });
@@ -56,7 +55,6 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
     } catch (_) { /* ignore */ }
   }
 
-  // Manejo de error uniforme
   if (!res.ok) {
     let data = null;
     try { data = await res.json(); } catch {}
@@ -72,8 +70,9 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
 }
 
 export const http = {
-  get:  (p, o)    => request(p, { ...o, method: "GET" }),
-  post: (p, o)    => request(p, { ...o, method: "POST" }),
-  put:  (p, o)    => request(p, { ...o, method: "PUT" }),
-  del:  (p, o)    => request(p, { ...o, method: "DELETE" }),
+  get:   (p, o) => request(p, { ...o, method: "GET" }),
+  post:  (p, o) => request(p, { ...o, method: "POST" }),
+  put:   (p, o) => request(p, { ...o, method: "PUT" }),
+  patch: (p, o) => request(p, { ...o, method: "PATCH" }),   // ← añadido
+  del:   (p, o) => request(p, { ...o, method: "DELETE" }),
 };

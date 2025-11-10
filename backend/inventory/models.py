@@ -1,8 +1,7 @@
-# inventory/models.py
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
-from django.utils import timezone  # ✅ OJO: este es el correcto
+from django.utils import timezone
 
 class Producto(models.Model):
     codigo = models.CharField(max_length=50, unique=True)
@@ -34,9 +33,7 @@ class Movimiento(models.Model):
     tipo = models.CharField(max_length=10, choices=TIPO)
     cantidad = models.IntegerField()
     fecha_mov = models.DateTimeField(auto_now_add=True)
-    # ✅ Nuevo: ligar movimiento a la venta (opcional)
-    venta = models.ForeignKey("Venta", null=True, blank=True,
-                              on_delete=models.SET_NULL, related_name="movimientos")
+    venta = models.ForeignKey("Venta", null=True, blank=True, on_delete=models.SET_NULL, related_name="movimientos")
 
     def __str__(self):
         return f"{self.tipo} p{self.producto_id} x{self.cantidad} (lote {self.lote_id or '-'})"
@@ -53,6 +50,7 @@ class Alerta(models.Model):
     estado = models.CharField(max_length=10, choices=ESTADO, default="activa")
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
+    explicacion = models.JSONField(null=True, blank=True)  # para ML
 
     class Meta:
         indexes = [
@@ -65,13 +63,14 @@ class Alerta(models.Model):
 
 class Venta(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
-    fecha = models.DateField(default=timezone.localdate)   # ✅ date puro
+    fecha = models.DateField(default=timezone.localdate)   # callable (ok)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    anulada = models.BooleanField(default=False)           # ✅ imprescindible
+    anulada = models.BooleanField(default=False)
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name="ventas"
     )
+
 class VentaItem(models.Model):
     venta = models.ForeignKey(Venta, related_name="items", on_delete=models.CASCADE)
     producto = models.ForeignKey("Producto", on_delete=models.PROTECT)

@@ -1,29 +1,35 @@
-// src/api/alerts.service.js
 import AlertsRepository from "./alerts.repository";
 
 const fromApi = (a) => ({
   id: a.id,
   tipo: a.tipo,
   estado: a.estado,
-  severidad: a.severidad,
+  severidad: a.criticidad,            // viene como 'criticidad' del backend
   mensaje: a.mensaje,
   productoId: a.producto,
   productoCodigo: a.producto_codigo,
   productoNombre: a.producto_nombre,
   loteId: a.lote,
-  creadoEn: a.creado_en,
-  resueltoEn: a.resuelto_en,
+  creadoEn: a.created_at,
+  resueltoEn: a.resolved_at,
+  explicacion: a.explicacion || null, // chips de razones (top factores, rmse, safety)
 });
 
 export const AlertsService = {
-  async list({ tipo = "stock", estado = "activa" } = {}) {
-    const data = await AlertsRepository.list({ tipo, estado });
+  async list({ estado = "activa", page = 1, page_size = 100 } = {}) {
+    const data = await AlertsRepository.list({ estado, page, page_size });
     const items = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
     return items.map(fromApi);
   },
+
   async recalc() {
     return AlertsRepository.recalc();
   },
+
+  async recalcPredict(h = 14) {
+    return AlertsRepository.recalcPredict(h);
+  },
+
   async resolve(id) {
     await AlertsRepository.resolve(id);
     return true;

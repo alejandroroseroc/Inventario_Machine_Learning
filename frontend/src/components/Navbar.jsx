@@ -1,4 +1,5 @@
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+// src/components/Navbar.jsx
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./Navbar.css";
 
@@ -9,8 +10,11 @@ export default function Navbar() {
 
   if (!isAuth) return null;
 
-  const active = (p) => pathname.startsWith(p) ? "nav__link nav__link--active" : "nav__link";
-  const onLogout = () => { try { logout(); } finally { nav("/login", { replace: true }); } };
+  const active = (p) => (pathname.startsWith(p) ? "nav__link nav__link--active" : "nav__link");
+  const onLogout = () => {
+    try { logout(); }
+    finally { nav("/login", { replace: true }); }
+  };
 
   return (
     <header className="nav">
@@ -18,9 +22,11 @@ export default function Navbar() {
         <div className="nav__brand">Droguería Niza I</div>
 
         <nav className="nav__menu">
-          <Link   className={active("/panel")}     to="/panel">Panel</Link>
-          <Link   className={active("/productos")} to="/productos">Inventario</Link>
-          <Link className={active("/ventas")}   to="/ventas">Ventas</Link>
+          <Link className={active("/panel")} to="/panel">Panel</Link>
+          <Link className={active("/productos")} to="/productos">Inventario</Link>
+          <Link className={active("/ventas")} to="/ventas">Ventas</Link>
+          {/*  Enlace a la vista de alertas/sugerencias */}
+          <Link className={active("/alertas")} to="/alertas/sugerencias">Alertas</Link>
         </nav>
 
         <div className="nav__spacer" />

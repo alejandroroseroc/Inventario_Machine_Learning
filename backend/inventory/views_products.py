@@ -1,3 +1,4 @@
+# backend/inventory/views_products.py
 from django.db import IntegrityError
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncMonth
@@ -6,13 +7,19 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from datetime import timedelta
+from math import ceil
+from django.utils import timezone
+
 from .models import Producto, Movimiento
 from .serializers import ProductoSerializer
 from .services import registrar_producto, obtener_productos, recalcular_productos
 from ml.baseline import predict_next_month_from_series
-from datetime import timedelta
-from math import ceil
-from django.utils import timezone
+
+# === IMPORTS NUEVOS (ML con clima/salud + rankings) ===
+from ml.linear_daily import forecast_daily
+from .repositories import productos_con_stock_total
+
 
 class ProductoListCreateView(generics.ListCreateAPIView):
     """
@@ -92,8 +99,81 @@ class ProductoForecastView(APIView):
             "prediction_units": pred,
             "history": history,
         }, status=status.HTTP_200_OK)
-    
 
+
+# =========================
+# NUEVO: Pronóstico diario ML (lags + clima Pasto + salud Nariño + Carnaval)
+# =========================
+class ProductoForecastDailyView(APIView):
+    """
+    GET /api/inventory/productos/<pk>/forecast_daily?h=14
+    Retorna:
+    - yhat_total: suma pronosticada para h días
+    - rmse: error reciente
+    - safety: stock de seguridad (por ABC)
+    - explicacion_top: top-3 factores (ej: health_idx, precip_sum, ma7)
+    - serie: [{date, yhat}] para h días
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            h = int(request.query_params.get("h", 14))
+        except ValueError:
+            return Response({"detail": "h inválido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            p = Producto.objects.get(id=pk)
+        except Producto.DoesNotExist:
+            return Response({"detail": "Producto no existe."}, status=status.HTTP_404_NOT_FOUND)
+
+        res = forecast_daily(producto_id=p.id, h=h, abc=(p.categoria or "C"))
+        return Response({
+            "producto": p.id,
+            "h": h,
+            "yhat_total": int(round(res.yhat_total)),
+            "rmse": round(res.rmse, 2),
+            "safety": int(res.safety),
+            "explicacion_top": res.top,  # propiedad del dataclass (mapea top_factors)
+            "serie": res.serie,
+        }, status=status.HTTP_200_OK)
+
+
+# =========================
+# NUEVO: Ranking por impacto de salud (qué se vendería más por picos epidemiológicos)
+# =========================
+class ProductosTopPorSaludView(APIView):
+    """
+    GET /api/inventory/forecast/top_by_health?h=14&n=10
+    Lista los N productos con mayor impacto positivo de 'health_idx' en el horizonte h.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            h = int(request.query_params.get("h", 14))
+            n = int(request.query_params.get("n", 10))
+        except ValueError:
+            return Response({"detail": "Parámetros inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        items = []
+        # productos_con_stock_total() debe anotar stock_total
+        for p in productos_con_stock_total().values("id", "nombre", "categoria"):
+            res = forecast_daily(producto_id=p["id"], h=h, abc=(p["categoria"] or "C"))
+            impact_salud = 0.0
+            for kv in res.top:
+                if kv.get("factor") == "health_idx":
+                    impact_salud = float(kv.get("impacto", 0.0))
+                    break
+            items.append({
+                "producto_id": p["id"],
+                "nombre": p["nombre"],
+                "impacto_salud": round(impact_salud, 2),
+                "yhat_total": int(round(res.yhat_total)),
+            })
+
+        items.sort(key=lambda x: x["impacto_salud"], reverse=True)
+        return Response({"h": h, "items": items[:n]}, status=status.HTTP_200_OK)
 
 
 class ProductoRopSugerirView(APIView):

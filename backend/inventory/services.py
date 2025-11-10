@@ -1,3 +1,4 @@
+# backend/inventory/services.py
 from datetime import date
 import math
 from decimal import Decimal
@@ -5,10 +6,10 @@ from typing import List, Optional
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Sum
 from django.utils import timezone
 
-from .models import Producto, Lote, Movimiento
+from .models import Producto, Lote, Movimiento, Alerta
 from .repositories import (
     valor_total_inventario,
     productos_bajo_rop_count,
@@ -23,7 +24,6 @@ from .repositories import (
     crear_alerta_stock,
     resolver_alertas_stock,
 )
-
 
 def compute_kpis():
     valor = valor_total_inventario()
@@ -73,7 +73,6 @@ def asegurar_alerta_stock(producto: Producto) -> bool:
         resolver_alertas_stock(producto.id)
         return False
 
-
 def recalcular_alertas_stock_todas():
     total = 0
     for p in Producto.objects.all().only("id", "punto_reorden", "codigo"):
@@ -91,7 +90,6 @@ def _calcular_rop(producto):
     dmd = demanda_media_diaria(producto, dias=ABC_WINDOW_DAYS)
     rop = math.ceil(dmd * ROP_LEAD_TIME * (1.0 + ROP_BUFFER))
     return max(0, int(rop))
-
 
 def _clasificacion_abc():
     ingresos = ingresos_por_producto(dias=ABC_WINDOW_DAYS)
@@ -113,10 +111,8 @@ def _clasificacion_abc():
             out[pid] = "C"
     return out
 
-
 def obtener_productos():
     return Producto.objects.all().order_by("id")
-
 
 @transaction.atomic
 def registrar_producto(data):
@@ -146,7 +142,6 @@ def registrar_producto(data):
     p.save()
     return p
 
-
 @transaction.atomic
 def recalcular_productos():
     mapa = _clasificacion_abc()
@@ -161,12 +156,10 @@ def recalcular_productos():
             updated += 1
     return {"updated": updated}
 
-
 def obtener_lotes(producto_id: int):
     if not Producto.objects.filter(id=producto_id).exists():
         raise ValidationError("Producto no encontrado.")
     return list(lotes_de_producto(producto_id))
-
 
 def registrar_lote(payload: dict):
     try:
@@ -195,32 +188,18 @@ def registrar_lote(payload: dict):
 
     return crear_lote(producto_id, fecha_caducidad, stock_lote)
 
-
 class StockError(Exception):
     ...
-
 
 class MovimientoValidationError(Exception):
     ...
 
-
 @transaction.atomic
 def registrar_movimiento(
-    *,
-    usuario,
-    producto_id: int,
-    tipo: str,
-    cantidad: int,
-    lote_id: Optional[int] = None,
-    fecha_caducidad: Optional[date] = None,
+    *, usuario, producto_id: int, tipo: str, cantidad: int,
+    lote_id: Optional[int] = None, fecha_caducidad: Optional[date] = None,
     motivo: Optional[str] = None,
 ) -> List[Movimiento]:
-    """
-    - ENTRADA: suma stock al lote indicado; si no hay lote y se envía fecha_caducidad, crea lote.
-    - SALIDA: descuenta del lote indicado o FEFO (varios lotes). Nunca deja stock < 0.
-    - AJUSTE: cantidad puede ser positiva o negativa. Respeta no stock negativo.
-    Retorna la lista de movimientos creados (pueden ser varios en SALIDA FEFO).
-    """
     try:
         producto = Producto.objects.get(id=producto_id)
     except Producto.DoesNotExist:
@@ -341,11 +320,9 @@ def registrar_movimiento(
                     .first()
                 )
                 if not lote:
-                    if not fecha_caducidad:
-                        fecha_caducidad = date.today().replace(year=date.today().year + 2)
-                    lote = Lote.objects.create(
-                        producto=producto, fecha_caducidad=fecha_caducidad, stock_lote=0
-                    )
+                    from datetime import date as _date
+                    fc = fecha_caducidad or _date.today().replace(year=_date.today().year + 2)
+                    lote = Lote.objects.create(producto=producto, fecha_caducidad=fc, stock_lote=0)
             lote.stock_lote = F("stock_lote") + qty
             lote.save(update_fields=["stock_lote"])
             lote.refresh_from_db()
@@ -421,3 +398,38 @@ def registrar_movimiento(
                     por_descontar -= toma
                 asegurar_alerta_stock(producto)
                 return movimientos_creados
+
+
+def _stock_total_producto(pid: int) -> int:
+    return int(Lote.objects.filter(producto_id=pid).aggregate(s=Sum("stock_lote"))["s"] or 0)
+
+def asegurar_alerta_sugerencia_stock(*, producto_id: int, mensaje: str, criticidad: str = "sugerencia", explicacion: dict | None = None):
+    """
+    Crea/actualiza UNA alerta 'stock' activa para sugerencia ML del producto.
+    """
+    al = (
+        Alerta.objects
+        .filter(tipo="stock", producto_id=producto_id, estado="activa", criticidad=criticidad)
+        .first()
+    )
+    if al:
+        changed = False
+        if al.mensaje != mensaje:
+            al.mensaje = mensaje
+            changed = True
+        if al.explicacion != explicacion:
+            al.explicacion = explicacion
+            changed = True
+        if changed:
+            al.save(update_fields=["mensaje", "explicacion"])
+        return al, False
+
+    al = Alerta.objects.create(
+        tipo="stock",
+        producto_id=producto_id,
+        mensaje=mensaje,
+        criticidad=criticidad,
+        estado="activa",
+        explicacion=explicacion,
+    )
+    return al, True

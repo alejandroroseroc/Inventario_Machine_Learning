@@ -1,12 +1,10 @@
 from rest_framework import serializers
-from .models import Producto, Lote
-from .models import Movimiento
-from .models import Alerta
+from .models import Producto, Lote, Movimiento, Alerta
 
 class ProductoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Producto
-        fields = ("id", "codigo", "nombre", "categoria", "punto_reorden", "valor_unitario","codigo_barras")
+        fields = ("id", "codigo", "nombre", "categoria", "punto_reorden", "valor_unitario", "codigo_barras")
 
     def validate_punto_reorden(self, value):
         if value < 0:
@@ -18,12 +16,11 @@ class ProductoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("El valor unitario no puede ser negativo.")
         return value
 
-
 class LoteSerializer(serializers.ModelSerializer):
     producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
     class Meta:
         model = Lote
-        fields = ("id", "producto", "producto_nombre", "fecha_caducidad", "stock_lote", "fecha_ingreso","codigo_barras")
+        fields = ("id", "producto", "producto_nombre", "fecha_caducidad", "stock_lote", "fecha_ingreso", "codigo_barras")
 
     def validate_stock_lote(self, v):
         if v < 0:
@@ -69,7 +66,7 @@ class MovimientoCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError({"detail": str(e)})
         except StockError as e:
             raise serializers.ValidationError({"detail": str(e)})
-        
+
 class AlertaSerializer(serializers.ModelSerializer):
     producto_codigo = serializers.CharField(source="producto.codigo", read_only=True)
     producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
@@ -80,4 +77,5 @@ class AlertaSerializer(serializers.ModelSerializer):
             "id", "tipo", "estado", "criticidad", "mensaje",
             "producto", "producto_codigo", "producto_nombre",
             "lote", "created_at", "resolved_at",
+            "explicacion",
         )

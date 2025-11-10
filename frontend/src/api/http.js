@@ -1,4 +1,4 @@
-const API = import.meta.env.VITE_API_URL; // ej: http://127.0.0.1:8000/api
+const API = import.meta.env.VITE_API_URL; // p.ej: http://127.0.0.1:8000/api
 
 function getAccess() {
   try { return localStorage.getItem("access") || localStorage.getItem("token") || ""; }
@@ -17,7 +17,7 @@ async function doFetch(method, path, body, headers) {
   });
 }
 
-function firstErrorFromPayload(p){
+function firstErrorFromPayload(p) {
   if (!p) return null;
   if (typeof p === "string") return p;
   if (typeof p === "object") {
@@ -40,7 +40,7 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
 
   let res = await doFetch(method, path, body, headers);
 
-  // Reintento con refresh si el token expira
+  // Reintento con refresh si expira
   if (auth && res.status === 401 && getRefresh()) {
     try {
       const r = await doFetch("POST", "/auth/refresh", { refresh: getRefresh() }, { "Content-Type": "application/json" });
@@ -73,6 +73,8 @@ export const http = {
   get:   (p, o) => request(p, { ...o, method: "GET" }),
   post:  (p, o) => request(p, { ...o, method: "POST" }),
   put:   (p, o) => request(p, { ...o, method: "PUT" }),
-  patch: (p, o) => request(p, { ...o, method: "PATCH" }),   // ← añadido
+  patch: (p, o = {}) => request(p, { ...o, method: "PATCH" }), // <- tolera omitir options
   del:   (p, o) => request(p, { ...o, method: "DELETE" }),
 };
+
+export default http;

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 
-export default function Login(){
+export default function Login() {
   const { login } = useAuth();
   const nav = useNavigate();
   const [email, setEmail] = useState("");
@@ -10,36 +10,80 @@ export default function Login(){
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function onSubmit(e){
+  async function onSubmit(e) {
     e.preventDefault();
-    setError(""); setBusy(true);
-    try{
+    setError("");
+    setBusy(true);
+    try {
       await login({ email, password });
       nav("/panel", { replace: true });
-    }catch(err){
-      setError(err?.payload?.detail || err?.message || "No se pudo iniciar sesión");
-    }finally{
+    } catch (err) {
+      setError(
+        err?.payload?.detail || err?.message || "No se pudo iniciar sesión"
+      );
+    } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="panel-wrap" style={{maxWidth:480}}>
-      <h2 className="panel-title">Iniciar sesión</h2>
-      {error && <div className="error">{error}</div>}
-      <form onSubmit={onSubmit} style={{display:"grid", gap:12}}>
-        <label>Correo</label>
-        <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+    <main className="auth-wrap" aria-labelledby="login-title">
+      <section className="auth-card">
+        <h1 id="login-title" className="auth-title">
+          Iniciar sesión
+        </h1>
+        <p className="auth-subtitle">
+          Ingresa tu correo y contraseña para acceder al panel.
+        </p>
 
-        <label>Contraseña</label>
-        <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required />
+        {error && (
+          <div className="error" role="alert">
+            {error}
+          </div>
+        )}
 
-        <button className="nav__logout" type="submit" disabled={busy} style={{background:"#16a34a"}}>
-          {busy ? "Entrando…" : "Entrar"}
-        </button>
-      </form>
+        <form
+          onSubmit={onSubmit}
+          style={{ display: "grid", gap: 12 }}
+          noValidate
+        >
+          <label htmlFor="login-email">Correo</label>
+          <input
+            id="login-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
 
-      <p style={{marginTop:12}}>¿No tienes cuenta? <Link to="/register">Regístrate</Link></p>
-    </div>
+          <label htmlFor="login-password">Contraseña</label>
+          <input
+            id="login-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="btn btn--primary"
+            aria-busy={busy}
+          >
+            {busy ? "Entrando…" : "Entrar"}
+          </button>
+        </form>
+
+        <p className="small" style={{ marginTop: 12 }}>
+          ¿No tienes cuenta?{" "}
+          <Link to="/register" className="link">
+            Regístrate
+          </Link>
+        </p>
+      </section>
+    </main>
   );
 }

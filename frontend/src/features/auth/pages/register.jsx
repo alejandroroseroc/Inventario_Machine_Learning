@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
-import { useNavigate, Link } from "react-router-dom";
 
 export default function RegisterPage() {
   const { register, login } = useAuth();
@@ -41,64 +41,82 @@ export default function RegisterPage() {
   }
 
   return (
-    <section className="max-w-md mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-4">Crear cuenta</h1>
+    <main className="auth-wrap" aria-labelledby="register-title">
+      <section className="auth-card">
+        <h1 id="register-title" className="auth-title">
+          Crear cuenta
+        </h1>
+        <p className="auth-subtitle">
+          Regístrate para gestionar el inventario de la droguería.
+        </p>
 
-      {error && <div className="mb-3 rounded bg-red-100 text-red-700 p-2">{error}</div>}
-      {okMsg && <div className="mb-3 rounded bg-green-100 text-green-700 p-2">{okMsg}</div>}
+        {error && (
+          <div className="error" role="alert">
+            {error}
+          </div>
+        )}
+        {okMsg && (
+          <div
+            className="small"
+            role="status"
+            style={{ marginTop: 6, color: "var(--primary-600)" }}
+          >
+            {okMsg}
+          </div>
+        )}
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm mb-1">Correo</label>
+        <form
+          onSubmit={onSubmit}
+          style={{ display: "grid", gap: 12, marginTop: 12 }}
+          noValidate
+        >
+          <label htmlFor="register-email">Correo</label>
           <input
+            id="register-email"
             type="email"
             value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="w-full border rounded px-3 py-2"
+            onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
             required
           />
-        </div>
 
-        <div>
-          <label className="block text-sm mb-1">Contraseña</label>
+          <label htmlFor="register-password">Contraseña</label>
           <input
+            id="register-password"
             type="password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="w-full border rounded px-3 py-2"
+            onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
             required
           />
-        </div>
 
-        <div>
-          <label className="block text-sm mb-1">Confirmar contraseña</label>
+          <label htmlFor="register-confirm">Confirmar contraseña</label>
           <input
+            id="register-confirm"
             type="password"
             value={confirm}
-            onChange={e => setConfirm(e.target.value)}
-            className="w-full border rounded px-3 py-2"
+            onChange={(e) => setConfirm(e.target.value)}
             autoComplete="new-password"
             required
           />
-        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded bg-blue-600 text-white py-2 hover:bg-blue-700 disabled:opacity-60"
-        >
-          {loading ? "Creando..." : "Crear cuenta"}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn btn--primary"
+            aria-busy={loading}
+          >
+            {loading ? "Creando..." : "Crear cuenta"}
+          </button>
+        </form>
 
-      <p className="text-sm mt-4 text-center">
-        ¿Ya tienes cuenta?{" "}
-        <Link to="/login" className="text-blue-600 hover:underline">
-          Inicia sesión
-        </Link>
-      </p>
-    </section>
+        <p className="small" style={{ marginTop: 12 }}>
+          ¿Ya tienes cuenta?{" "}
+          <Link to="/login" className="link">
+            Inicia sesión
+          </Link>
+        </p>
+      </section>
+    </main>
   );
 }

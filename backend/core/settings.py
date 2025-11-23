@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import timedelta
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -55,11 +56,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# Base de datos
+# =======================
+# Base de datos (normal vs stress)
+# =======================
+
+# Si USE_STRESS_DB=1 en las variables de entorno, usamos inventario_stress_db.
+# Si no está definida (o es 0), usamos la BD normal inventario_db.
+USE_STRESS_DB = os.environ.get("USE_STRESS_DB", "0") == "1"
+
+DB_NAME = "inventario_stress_db" if USE_STRESS_DB else "inventario_db"
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": DB_NAME,
+        # Puedes dejar estos fijos o también sacarlos de variables de entorno
+        "USER": os.environ.get("POSTGRES_USER", "postgres"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "1122"),
+        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5433"),
     }
 }
 

@@ -23,10 +23,16 @@ const reasonText = (a) => {
   const top = a?.explicacion?.top || [];
   if (!top.length) return "Estimación de demanda";
   const first = top[0]?.factor;
-  if (first === "health_idx") return "Demanda prevista por picos de salud";
-  if (first === "temp_mean" || first === "precip_sum") return "Demanda prevista basada en el clima";
-  if (first === "carnaval") return "Demanda prevista por Carnaval de Negros y Blancos";
-  if (first === "ma7" || first === "lag1" || first === "lag7") return "Patrón reciente de ventas";
+  if (first === "health_idx") return "Demanda por picos de salud";
+  if (first === "temp_mean") return "Condiciones de temperatura";
+  if (first === "precip_sum") return "Temporada de lluvias";
+  if (first === "carnaval") return "Carnaval de Pasto";
+  if (first === "ma7") return "Tendencia ascendente";
+  if (first === "lag1" || first === "lag7") return "Patrón histórico";
+  if (typeof first === "string" && first.startsWith("dow_")) {
+    const dia = factorLabel(first);
+    return `Mayor demanda los ${dia}`;
+  }
   return `Factor: ${factorLabel(first)}`;
 };
 
@@ -54,7 +60,7 @@ const asArray = (x) => {
 };
 
 export default function AlertsAndSuggestions() {
-  const [tab, setTab] = useState("caducan"); // "caducan" | "reorden"
+  const [tab, setTab] = useState("caducan");
   const [estado, setEstado] = useState("activa");
   const [diasVenc, setDiasVenc] = useState(60);
 
@@ -68,22 +74,29 @@ export default function AlertsAndSuggestions() {
     setLoading(true);
     setErr("");
     try {
+      // Cargar lotes por vencer
       const lotesRaw = await listLotesPorVencer({ dias: diasVenc });
+      console.log("Lotes crudos:", lotesRaw); // DEBUG
+      
       const lotes = asArray(lotesRaw).map((x) => ({
-        id: x.id,
-        productoNombre: x.producto_nombre ?? x.producto?.nombre ?? "-",
-        numeroLote: x.numero_lote ?? x.numero ?? "-",
-        cantidad: x.stock_lote ?? x.cantidad ?? 0,
+        id: x.lote_id || x.id,
+        productoNombre: x.producto_nombre || x.producto?.nombre || "-",
+        numeroLote: x.numero_lote || x.numero || "-",
+        cantidad: x.stock_lote || x.cantidad || 0,
         fechaCaducidad: x.fecha_caducidad,
-        diasRestantes: x.dias_restantes ?? null,
+        diasRestantes: x.days_left || daysLeft(x.fecha_caducidad),
       }));
 
+      // Cargar alertas
       const alerts = await AlertsService.list({ estado });
+      console.log("Alertas crudas:", alerts); // DEBUG
+      
       const mlOnly = alerts.filter((a) => a?.explicacion && Array.isArray(a.explicacion.top));
 
       setExpiring(lotes);
       setMlAlerts(mlOnly);
     } catch (e) {
+      console.error("Error cargando datos:", e);
       setErr(e?.response?.data?.detail || "No fue posible cargar datos.");
     } finally {
       setLoading(false);
@@ -92,7 +105,6 @@ export default function AlertsAndSuggestions() {
 
   useEffect(() => {
     cargar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado, diasVenc]);
 
   const onResolve = async (id) => {
@@ -117,10 +129,10 @@ export default function AlertsAndSuggestions() {
   const rowsCaducan = useMemo(
     () =>
       (expiring || []).map((r, i) => {
-        const dias = r.diasRestantes ?? daysLeft(r.fechaCaducidad);
+        const dias = r.diasRestantes;
         const estadoDia = dias === null ? "-" : dias < 0 ? "Caducada" : dias;
         return (
-          <tr key={r.id ?? i}>
+          <tr key={r.id || i}>
             <td>{r.productoNombre}</td>
             <td>{r.numeroLote}</td>
             <td>{r.cantidad ? `${r.cantidad} unidades` : "-"}</td>
@@ -141,28 +153,61 @@ export default function AlertsAndSuggestions() {
     () =>
       (mlAlerts || []).map((a) => {
         const cant = parseSuggestedUnits(a.mensaje);
+        const explicacion = a.explicacion || {};
+        
         return (
           <tr key={a.id}>
-            <td>{a.productoNombre}</td>
-            <td>{Number.isFinite(cant) ? `${cant} unidades` : a.mensaje}</td>
+            <td>
+              <div>
+                <strong style={{ fontSize: '1.1rem', color: '#000', display: 'block', marginBottom: '4px' }}>
+                  {/* CORREGIDO: Usar producto_nombre del backend */}
+                  {a.producto_nombre || a.productoNombre || "Nombre no disponible"}
+                </strong>
+                <div style={{ fontSize: '0.875rem', color: '#666' }}>
+                  Código: {a.producto_codigo || "Sin código"}
+                  {explicacion.yhat_total && ` • Pronóstico: ${Math.round(explicacion.yhat_total)} uds`}
+                  {explicacion.safety && ` • Stock seguridad: ${explicacion.safety} uds`}
+                </div>
+              </div>
+            </td>
+            <td>
+              <strong style={{ fontSize: '1.1rem', color: '#2c5aa0' }}>
+                {Number.isFinite(cant) ? `${cant} unidades` : a.mensaje}
+              </strong>
+            </td>
             <td>
               <div className="chips">
-                <span className="chip">{reasonText(a)}</span>
-                {(a?.explicacion?.top || []).slice(0, 3).map((t) => (
-                  <span key={t.factor} className="chip ghost">
+                <span className="chip" style={{ backgroundColor: '#e8f4fd', color: '#000' }}>
+                  {reasonText(a)}
+                </span>
+                {(explicacion.top || []).slice(0, 2).map((t, idx) => (
+                  <span key={idx} className="chip ghost" style={{ color: '#000' }}>
                     {factorLabel(t.factor)}
                   </span>
                 ))}
               </div>
+              {explicacion.rmse && (
+                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '4px' }}>
+                  📊 Error: {explicacion.rmse.toFixed(1)} uds • {explicacion.h || 14}d
+                </div>
+              )}
             </td>
-            <td><span className="tag tag-yellow">Pendiente</span></td>
+            <td>
+              <span className="tag tag-blue">Sugerencia ML</span>
+            </td>
             <td className="text-right">
-              <button type="button" className="btn ghost" onClick={() => onResolve(a.id)}>Aprobar</button>
+              <button 
+                type="button" 
+                className="btn primary" 
+                onClick={() => onResolve(a.id)}
+                style={{ marginRight: '8px' }}
+              >
+                Aprobar
+              </button>
               <button
                 type="button"
                 className="btn danger"
                 onClick={() => onResolve(a.id)}
-                style={{ marginLeft: 8 }}
               >
                 Rechazar
               </button>
@@ -178,7 +223,6 @@ export default function AlertsAndSuggestions() {
       <h1 id="alerts-title">Alertas y sugerencias</h1>
 
       <div className="card" style={{ paddingTop: 0 }}>
-        {/* Tabs accesibles */}
         <div className="tabs" role="tablist" aria-label="Vistas de alertas">
           <button
             type="button"
@@ -253,7 +297,7 @@ export default function AlertsAndSuggestions() {
                 <caption className="sr-only">Lotes próximos a caducar</caption>
                 <thead>
                   <tr>
-                    <th scope="col">NOMBRE DE LA MARCA</th>
+                    <th scope="col">NOMBRE DEL PRODUCTO</th>
                     <th scope="col">NÚMERO DE LOTE</th>
                     <th scope="col">CANTIDAD</th>
                     <th scope="col">FECHA DE CADUCIDAD</th>
@@ -266,8 +310,8 @@ export default function AlertsAndSuggestions() {
                     rowsCaducan
                   ) : (
                     <tr>
-                      <td colSpan={6}>
-                        <em>Sin registros</em>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>
+                        <em>No hay lotes próximos a caducar</em>
                       </td>
                     </tr>
                   )}
@@ -290,9 +334,9 @@ export default function AlertsAndSuggestions() {
                 <caption className="sr-only">Sugerencias de reordenamiento</caption>
                 <thead>
                   <tr>
-                    <th scope="col">NOMBRE DEL MEDICAMENTO</th>
+                    <th scope="col">MEDICAMENTO</th>
                     <th scope="col">CANTIDAD SUGERIDA</th>
-                    <th scope="col">RAZÓN</th>
+                    <th scope="col">RAZÓN Y FACTORES</th>
                     <th scope="col">ESTADO</th>
                     <th scope="col" className="text-right">ACCIONES</th>
                   </tr>
@@ -302,8 +346,8 @@ export default function AlertsAndSuggestions() {
                     rowsReorden
                   ) : (
                     <tr>
-                      <td colSpan={5}>
-                        <em>No hay sugerencias generadas.</em>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
+                        <em>No hay sugerencias generadas. Haz clic en "Recalcular" para generarlas.</em>
                       </td>
                     </tr>
                   )}

@@ -1,7 +1,7 @@
 # ml/linear_daily.py
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import timedelta, date
 from typing import Optional
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -24,7 +24,6 @@ class ForecastResult:
     serie: list          # lista de {"date": ISO, "yhat": float}
     top_factors: list    # lista de {"factor": str, "impacto": float}
 
-    # Back-compat: res.top sigue funcionando pero sin gatillar el linter de CSS
     @property
     def top(self) -> list:
         return self.top_factors
@@ -57,29 +56,53 @@ def _daily_series(producto_id: int, lookback_days: int = 180) -> list:
 
 
 def _merge_external(rows: list) -> list:
+    """Merge datos externos con tolerancia total a fallos"""
     if not rows:
         return rows
+        
     start, end = rows[0]["date"], rows[-1]["date"]
-
-    weather = fetch_weather_daily(start, end)   # {'YYYY-MM-DD': {'temp_mean', 'precip_sum'}}
-    health  = fetch_health_daily(start, end)    # {'YYYY-MM-DD': {'health_idx'}}
-
+    
+    # Obtener datos externos con manejo de errores
+    weather, health = {}, {}
+    
+    try:
+        weather = fetch_weather_daily(start, end)
+        print(f"✓ Clima obtenido: {len(weather)} días")
+    except Exception as e:
+        print(f"✗ Clima falló: {e}")
+        # Crear datos por defecto
+        current = start
+        while current <= end:
+            weather[current.isoformat()] = {"temp_mean": 18.0, "precip_sum": 2.5}
+            current += timedelta(days=1)
+    
+    try:
+        health = fetch_health_daily(start, end)
+        print(f"✓ Salud obtenido: {len(health)} días")
+    except Exception as e:
+        print(f"✗ Salud falló: {e}")
+        # Crear datos por defecto
+        current = start
+        while current <= end:
+            health[current.isoformat()] = {"health_idx": 0.5}
+            current += timedelta(days=1)
+    
+    # Merge seguro
     out = []
     for r in rows:
         k = r["date"].isoformat()
-        w = weather.get(k, {"temp_mean": 0.0, "precip_sum": 0.0})
-        h = health.get(k, {"health_idx": 0.0})
         r2 = dict(r)
-        r2.update(w)
-        r2.update(h)
+        r2.update(weather.get(k, {"temp_mean": 18.0, "precip_sum": 2.5}))
+        r2.update(health.get(k, {"health_idx": 0.5}))
         out.append(r2)
+    
     return out
 
 
 def _build_matrix(rows: list):
     """
     Features:
-      y_lag1, y_lag7, MA7, dummies DOW(1..6) [0 baseline], carnaval, temp_mean, precip_sum, health_idx
+        y_lag1, y_lag7, MA7, dummies DOW(1..6) [0 baseline], carnaval, temp_mean, precip_sum, health_idx
     """
     X, Y, dates = [], [], []
     for i in range(len(rows)):
@@ -137,7 +160,7 @@ def _predict_iterative(model: LinearRegression, hist_rows: list, feature_names: 
             ma7 = sum(r["y"] for r in hist_rows[-7:]) / 7.0
             dow = d.weekday()
             dummies = [1 if dow == k else 0 for k in range(1, 7)]
-            # futuro: uso último valor observado de exógenas (simple)
+            # Usar último valor observado de exógenas
             last = hist_rows[-1]
             temp_mean = float(last.get("temp_mean", 0.0))
             precip_sum = float(last.get("precip_sum", 0.0))
@@ -163,37 +186,54 @@ def _predict_iterative(model: LinearRegression, hist_rows: list, feature_names: 
 
 
 def forecast_daily(producto_id: int, h: int = 14, lookback_days: int = 180, abc: Optional[str] = None) -> ForecastResult:
-    rows = _merge_external(_daily_series(producto_id, lookback_days))
-    X, Y, dates, feature_names = _build_matrix(rows)
+    try:
+        rows = _merge_external(_daily_series(producto_id, lookback_days))
+        X, Y, dates, feature_names = _build_matrix(rows)
 
-    if len(Y) < 30:
-        return ForecastResult(yhat_total=0, rmse=0, safety=0, serie=[], top_factors=[])
+        if len(Y) < 10:  # Reducido el mínimo para más flexibilidad
+            return ForecastResult(
+                yhat_total=0,
+                rmse=0,
+                safety=0,
+                serie=[],
+                top_factors=[{"factor": "insuficientes_datos", "impacto": 0}]
+            )
 
-    model = LinearRegression().fit(X, Y)
+        model = LinearRegression().fit(X, Y)
 
-    val_k = min(28, len(Y))
-    y_pred = model.predict(X[-val_k:])
-    rmse = _rmse(Y[-val_k:], y_pred)
+        val_k = min(14, len(Y))  # Reducido para datasets pequeños
+        y_pred = model.predict(X[-val_k:])
+        rmse = _rmse(Y[-val_k:], y_pred)
 
-    cat = (abc or "C")
-    z = 1.64 if cat == "A" else (1.28 if cat == "B" else 0.84)
-    safety = int(np.ceil(z * rmse))
+        cat = (abc or "C")
+        z = 1.64 if cat == "A" else (1.28 if cat == "B" else 0.84)
+        safety = int(np.ceil(z * rmse))
 
-    hist_copy = rows.copy()
-    serie, contrib_sum = _predict_iterative(model, hist_copy, feature_names, h)
-    yhat_total = float(sum(s["yhat"] for s in serie))
+        hist_copy = rows.copy()
+        serie, contrib_sum = _predict_iterative(model, hist_copy, feature_names, h)
+        yhat_total = float(sum(s["yhat"] for s in serie))
 
-    top_pairs = sorted(
-        [{"factor": fn, "impacto": float(v)} for fn, v in zip(feature_names, contrib_sum)],
-        key=lambda x: x["impacto"],
-        reverse=True,
-    )
-    top = [p for p in top_pairs if p["impacto"] > 0][:3]
+        # Mejorar cálculo de factores importantes (usar valor absoluto)
+        top_pairs = sorted(
+            [{"factor": fn, "impacto": float(abs(v))} for fn, v in zip(feature_names, contrib_sum)],
+            key=lambda x: x["impacto"],
+            reverse=True,
+        )
+        top = top_pairs[:3]
 
-    return ForecastResult(
-        yhat_total=yhat_total,
-        rmse=rmse,
-        safety=safety,
-        serie=serie,
-        top_factors=top,
-    )
+        return ForecastResult(
+            yhat_total=yhat_total,
+            rmse=rmse,
+            safety=safety,
+            serie=serie,
+            top_factors=top,
+        )
+    except Exception as e:
+        print(f"Error en forecast_daily para producto {producto_id}: {e}")
+        return ForecastResult(
+            yhat_total=0,
+            rmse=0,
+            safety=0,
+            serie=[],
+            top_factors=[{"factor": "error", "impacto": 0}]
+        )

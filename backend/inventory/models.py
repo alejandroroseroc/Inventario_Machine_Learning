@@ -4,12 +4,25 @@ from django.conf import settings
 from django.utils import timezone
 
 class Producto(models.Model):
-    codigo = models.CharField(max_length=50, unique=True)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="productos",
+        null=True,
+        blank=True
+    )
+    codigo = models.CharField(max_length=50)
     nombre = models.CharField(max_length=200)
     categoria = models.CharField(max_length=1, choices=[("A","A"),("B","B"),("C","C")], default="C")
     punto_reorden = models.IntegerField(default=0)
     valor_unitario = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     codigo_barras = models.CharField(max_length=32, blank=True, null=True)
+
+    class Meta:
+        # El código es único solo para cada usuario
+        constraints = [
+            models.UniqueConstraint(fields=["usuario", "codigo"], name="unique_codigo_per_user")
+        ]
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"

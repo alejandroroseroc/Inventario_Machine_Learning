@@ -1,8 +1,7 @@
-# backend/inventory/urls.py
 from django.urls import path
 
-from .views import KPIView
-from .views_products import (
+from .api.views import (
+    KPIView,
     ProductoListCreateView,
     RecalcularProductosView,
     ProductoDetailView,
@@ -10,16 +9,20 @@ from .views_products import (
     ProductoRopSugerirView,
     ProductoForecastDailyView,
     ProductosTopPorSaludView,
-)
-from .views_lotes import LoteListCreateView, LotesPorVencerView
-from .views_movimientos import MovimientoListCreateView
-from .views_alertas import (
+    LoteListCreateView,
+    LotesPorVencerView,
+    MovimientoListCreateView,
     AlertasStockListView,
     AlertasStockRecalcularView,
     AlertasStockRecalcularPredictView,
     AlertaResolverView,
+    VentaListCreateView,
+    VentaDetailView,
+    VentaCierreDiaView,
+    VentaMonthlyHistoryView,
+    CSVImportView,
 )
-from .views_ventas import VentaListCreateView, VentaDetailView, VentaCierreDiaView
+
 
 urlpatterns = [
     path("panel/kpis", KPIView.as_view(), name="panel-kpis"),
@@ -49,7 +52,12 @@ urlpatterns = [
     path("inventory/ventas", VentaListCreateView.as_view(), name="ventas-list-create"),
     path("inventory/ventas/<int:pk>", VentaDetailView.as_view(), name="ventas-detail"),
     path("inventory/ventas/cierre", VentaCierreDiaView.as_view(), name="ventas-cierre"),
+    path("inventory/ventas/historial-mensual", VentaMonthlyHistoryView.as_view(), name="ventas-historial-mensual"),
 
     # Analítica
     path("inventory/forecast/top_by_health", ProductosTopPorSaludView.as_view(), name="forecast-top-by-health"),
+
+    # Imports
+    path("inventory/import-csv", CSVImportView.as_view(), name="import-csv"),
 ]
+

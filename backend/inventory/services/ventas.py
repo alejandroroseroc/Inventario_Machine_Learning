@@ -1,8 +1,10 @@
-# inventory/services_ventas.py
 from decimal import Decimal
+
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from .models import Producto, Lote, Movimiento, Venta, VentaItem
+
+from inventory.models import Producto, Lote, Movimiento, Venta, VentaItem
+
 
 def _fefo_parts_for(producto_id: int, cantidad: int):
     """
@@ -13,9 +15,9 @@ def _fefo_parts_for(producto_id: int, cantidad: int):
         raise ValidationError("Cantidad inválida.")
 
     lotes = (Lote.objects
-                  .select_for_update()
-                  .filter(producto_id=producto_id, stock_lote__gt=0)
-                  .order_by("fecha_caducidad", "id"))
+                .select_for_update()
+                .filter(producto_id=producto_id, stock_lote__gt=0)
+                .order_by("fecha_caducidad", "id"))
 
     partes = []
     restante = int(cantidad)
@@ -29,11 +31,11 @@ def _fefo_parts_for(producto_id: int, cantidad: int):
             restante -= tomar
 
     if restante > 0:
-        # No alcanza sumando todos los lotes
         total_disp = int(cantidad) - restante
         raise ValidationError(f"Stock total insuficiente: solicitado {cantidad}, disponible {total_disp}.")
 
     return partes
+
 
 @transaction.atomic
 def crear_venta(items, user=None):
@@ -53,33 +55,29 @@ def crear_venta(items, user=None):
         pid = int(it["producto"])
         cant = int(it["cantidad"])
         precio = Decimal(str(it.get("precio_unitario", 0)))
+        if precio < 500:
+            raise ValidationError(f"El precio unitario debe ser al menos 500 COP (producto {pid}).")
+        
         lote_id = it.get("lote")
 
-        # Bloqueo de producto para consistencia (si quieres)
         prod = Producto.objects.select_for_update().get(id=pid)
 
-        # Partición FEFO (uno o varios lotes)
         if lote_id:
-            # Forzar ese lote
             lote = (Lote.objects.select_for_update()
-                             .get(id=int(lote_id), producto_id=pid))
+                            .get(id=int(lote_id), producto_id=pid))
             if lote.stock_lote < cant:
                 raise ValidationError(f"Stock insuficiente en lote #{lote.id} (tiene {lote.stock_lote}).")
             partes = [(lote, cant)]
         else:
             partes = _fefo_parts_for(pid, cant)
 
-        # Ejecutar consumo por cada parte
         for lote, q in partes:
-            # Item por lote (más claro para auditoría)
             VentaItem.objects.create(
                 venta=venta, producto=prod, lote=lote,
                 cantidad=q, precio_unitario=precio
             )
-            # Descontar
             lote.stock_lote -= q
             lote.save(update_fields=["stock_lote"])
-            # Movimiento
             Movimiento.objects.create(
                 producto=prod, tipo="salida", cantidad=q,
                 lote=lote, venta=venta, usuario=user
@@ -89,6 +87,7 @@ def crear_venta(items, user=None):
     venta.total = total
     venta.save(update_fields=["total"])
     return venta
+
 
 @transaction.atomic
 def anular_venta(venta_id, user=None):

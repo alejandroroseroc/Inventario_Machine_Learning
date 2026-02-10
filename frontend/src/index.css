@@ -66,3 +66,8 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-danger { color: #ef4444; }
+.text-warn { color: #f59e0b; }

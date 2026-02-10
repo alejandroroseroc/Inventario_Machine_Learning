@@ -68,8 +68,13 @@ export default function VentasListPage() {
                       className="btn btn--danger"
                       onClick={async () => {
                         if (!confirm(`¿Anular venta #${v.id}?`)) return;
-                        await anularVenta(v.id);
-                        load(fecha);
+                        try {
+                          await anularVenta(v.id);
+                          load(fecha);
+                        } catch (e) {
+                          const msg = e?.response?.data?.detail || e.message || JSON.stringify(e);
+                          alert(`No se pudo anular: ${msg}`);
+                        }
                       }}
                     >
                       Anular

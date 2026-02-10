@@ -1,4 +1,5 @@
 from datetime import timedelta
+
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
@@ -6,9 +7,9 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Lote
-from .serializers import LoteSerializer
-from .services import registrar_lote
+from inventory.models import Lote
+from inventory.api.serializers import LoteSerializer
+from inventory.services import registrar_lote
 
 
 class LoteListCreateView(generics.ListCreateAPIView):
@@ -20,7 +21,9 @@ class LoteListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Lote.objects.select_related("producto").all().order_by("fecha_caducidad", "id")
+        qs = Lote.objects.select_related("producto").filter(
+            producto__usuario=self.request.user
+        ).order_by("fecha_caducidad", "id")
         producto = self.request.query_params.get("producto")
         if producto:
             qs = qs.filter(producto_id=producto)
@@ -29,7 +32,6 @@ class LoteListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(numero_lote=numero_lote.strip())
         return qs
 
-    # Usamos el servicio para mantener la lógica centralizada
     def create(self, request, *args, **kwargs):
         try:
             lote = registrar_lote(request.data)
@@ -57,6 +59,7 @@ class LotesPorVencerView(APIView):
         limite = hoy + timedelta(days=dias)
 
         qs = Lote.objects.select_related("producto").filter(
+            producto__usuario=request.user,
             fecha_caducidad__lte=limite,
             stock_lote__gt=0
         )
@@ -75,4 +78,4 @@ class LotesPorVencerView(APIView):
                 "stock_lote": l.stock_lote,
             })
 
-        return Response({"count": len(items), "items": items}, status=status.HTTP_200_OK)
+        return Response({"count": len(items), "results": items}, status=status.HTTP_200_OK)

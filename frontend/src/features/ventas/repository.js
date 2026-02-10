@@ -38,3 +38,8 @@ export async function getCierreDia(fechaIso) {
 export async function anularVenta(id) {
   return http.delete(`/inventory/ventas/${id}`, { auth: true });
 }
+
+// Historial mensual de ventas
+export async function getHistorialMensual() {
+  return http.get(`/inventory/ventas/historial-mensual`, { auth: true });
+}

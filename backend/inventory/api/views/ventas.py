@@ -1,15 +1,22 @@
-# inventory/views_ventas.py
 from datetime import datetime
+from django.db.models import Sum
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Venta
-from .serializers_ventas import VentaSerializer
-from .services_ventas import crear_venta, anular_venta
+
+from inventory.models import Venta
+from inventory.api.serializers import VentaSerializer
+from inventory.services import crear_venta, anular_venta
+
 
 class VentaListCreateView(APIView):
+    """
+    GET  /api/inventory/ventas?fecha=YYYY-MM-DD
+    POST /api/inventory/ventas
+    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -22,7 +29,7 @@ class VentaListCreateView(APIView):
         else:
             fecha = timezone.localdate()
 
-        qs = Venta.objects.filter(fecha=fecha).order_by("-id")  # ✅ DateField
+        qs = Venta.objects.filter(fecha=fecha, usuario=request.user).order_by("-id")
         return Response(VentaSerializer(qs, many=True).data, status=200)
 
     def post(self, request):
@@ -34,11 +41,18 @@ class VentaListCreateView(APIView):
             msg = getattr(e, "message", None) or str(e)
             return Response({"detail": msg}, status=400)
 
+
 class VentaDetailView(generics.RetrieveDestroyAPIView):
+    """
+    GET    /api/inventory/ventas/<pk>
+    DELETE /api/inventory/ventas/<pk> (anula)
+    """
     permission_classes = [permissions.IsAuthenticated]
-    queryset = Venta.objects.all()
     serializer_class = VentaSerializer
     lookup_field = "pk"
+
+    def get_queryset(self):
+        return Venta.objects.filter(usuario=self.request.user)
 
     def delete(self, request, *args, **kwargs):
         try:
@@ -47,8 +61,12 @@ class VentaDetailView(generics.RetrieveDestroyAPIView):
         except (ValidationError, ValueError) as e:
             msg = getattr(e, "message", None) or str(e)
             return Response({"detail": msg}, status=400)
+        except Exception as e:
+            return Response({"detail": f"Error interno: {str(e)}"}, status=400)
+
 
 class VentaCierreDiaView(APIView):
+    """GET /api/inventory/ventas/cierre?fecha=YYYY-MM-DD"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -61,7 +79,7 @@ class VentaCierreDiaView(APIView):
         else:
             fecha = timezone.localdate()
 
-        qs = Venta.objects.filter(fecha=fecha).order_by("id")
+        qs = Venta.objects.filter(fecha=fecha, usuario=request.user).order_by("id")
         total_ventas = sum(v.total for v in qs if not v.anulada)
         data = {
             "fecha": fecha.isoformat(),
@@ -70,4 +88,45 @@ class VentaCierreDiaView(APIView):
             "total_dia": float(total_ventas),
             "items": VentaSerializer(qs, many=True).data
         }
+        return Response(data, status=200)
+
+
+class VentaMonthlyHistoryView(APIView):
+    """
+    GET /api/inventory/ventas/historial-mensual
+    Retorna el total de ventas por mes para el usuario actual en el año actual.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        año_actual = timezone.localdate().year
+        
+        # Agrupar por mes, sumar total de ventas no anuladas
+        historial = (
+            Venta.objects.filter(
+                usuario=request.user,
+                anulada=False,
+                fecha__year=año_actual
+            )
+            .annotate(mes=TruncMonth('fecha'))
+            .values('mes')
+            .annotate(total=Sum('total'))
+            .order_by('mes')
+        )
+        
+        data = []
+        meses_nombres = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ]
+        
+        for entry in historial:
+            # entry['mes'] es un datetime.date o datetime.datetime (inicio de mes)
+            mes_num = entry['mes'].month
+            data.append({
+                "mes": meses_nombres[mes_num - 1],
+                "mes_num": mes_num,
+                "total": float(entry['total'])
+            })
+            
         return Response(data, status=200)

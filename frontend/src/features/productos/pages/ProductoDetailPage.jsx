@@ -52,7 +52,9 @@ export default function ProductoDetailPage() {
         ]);
         setForecast(f);
         setLotes(ls || []);
-        setPorVencer(pv.items ?? []);
+
+        setPorVencer(pv.results || pv.items || []);
+
       } catch {
         setError("No se pudo cargar el producto.");
       } finally {
@@ -377,16 +379,15 @@ export default function ProductoDetailPage() {
                 .slice()
                 .sort((a, b) => String(a.fecha_caducidad).localeCompare(String(b.fecha_caducidad)))
                 .map((l) => {
-                  const pv = (porVencer || []).find((x) => x.lote_id === l.id);
-                  const days = pv?.days_left ?? "";
+                  const days = l.days_left ?? "";
                   const cls = days === "" ? "" : days <= 30 ? "text-danger" : days <= 60 ? "text-warn" : "";
                   return (
                     <tr key={l.id}>
                       <td>{l.id}</td>
-                      <td>{l.numero_lote || "-"}</td>
+                      <td>{l.numero_lote || <span className="muted">Sin Lote</span>}</td>
                       <td>{l.fecha_caducidad}</td>
-                      <td className={cls}>{days !== "" ? days : "-"}</td>
-                      <td>{l.stock_lote}</td>
+                      <td style={{ textAlign: "center" }} className={cls}>{days !== "" ? days : "-"}</td>
+                      <td style={{ textAlign: "center" }}>{l.stock_lote}</td>
                     </tr>
                   );
                 })}

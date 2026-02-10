@@ -1,4 +1,4 @@
-const API = import.meta.env.VITE_API_URL; // p.ej: http://127.0.0.1:8000/api
+const API = import.meta.env.VITE_API_URL;
 
 function getAccess() {
   try { return localStorage.getItem("access") || localStorage.getItem("token") || ""; }
@@ -10,12 +10,20 @@ function getRefresh() {
 }
 
 async function doFetch(method, path, body, headers) {
-  return fetch(`${API}${path}`, {
+  const isFormData = body instanceof FormData;
+  const options = {
     method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+    headers: { ...headers },
+    body: isFormData ? body : (body !== undefined ? JSON.stringify(body) : undefined),
+  };
+
+  if (!isFormData && body !== undefined) {
+    options.headers["Content-Type"] = "application/json";
+  }
+
+  return fetch(`${API}${path}`, options);
 }
+
 
 function firstErrorFromPayload(p) {
   if (!p) return null;
@@ -32,7 +40,7 @@ function firstErrorFromPayload(p) {
 }
 
 async function request(path, { method = "GET", body, auth = false } = {}) {
-  const headers = { "Content-Type": "application/json" };
+  const headers = {};
   if (auth) {
     const t = getAccess();
     if (t) headers.Authorization = `Bearer ${t}`;
@@ -43,7 +51,7 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
   // Reintento con refresh si expira
   if (auth && res.status === 401 && getRefresh()) {
     try {
-      const r = await doFetch("POST", "/auth/refresh", { refresh: getRefresh() }, { "Content-Type": "application/json" });
+      const r = await doFetch("POST", "/auth/refresh", { refresh: getRefresh() });
       if (r.ok) {
         const j = await r.json();
         if (j?.access) {
@@ -55,9 +63,10 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
     } catch (_) { /* ignore */ }
   }
 
+
   if (!res.ok) {
     let data = null;
-    try { data = await res.json(); } catch {}
+    try { data = await res.json(); } catch { }
     if (import.meta.env.DEV) console.warn("API error", res.status, data);
     const err = new Error(firstErrorFromPayload(data) || `Error ${res.status}`);
     err.status = res.status;
@@ -70,11 +79,11 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
 }
 
 export const http = {
-  get:   (p, o) => request(p, { ...o, method: "GET" }),
-  post:  (p, o) => request(p, { ...o, method: "POST" }),
-  put:   (p, o) => request(p, { ...o, method: "PUT" }),
+  get: (p, o) => request(p, { ...o, method: "GET" }),
+  post: (p, o) => request(p, { ...o, method: "POST" }),
+  put: (p, o) => request(p, { ...o, method: "PUT" }),
   patch: (p, o = {}) => request(p, { ...o, method: "PATCH" }), // <- tolera omitir options
-  del:   (p, o) => request(p, { ...o, method: "DELETE" }),
+  del: (p, o) => request(p, { ...o, method: "DELETE" }),
 };
 
 export default http;

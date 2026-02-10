@@ -1,7 +1,7 @@
-# backend/inventory/views_products.py
 from django.db import IntegrityError
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncMonth
+from django.utils import timezone
 
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -9,16 +9,13 @@ from rest_framework.views import APIView
 
 from datetime import timedelta
 from math import ceil
-from django.utils import timezone
 
-from .models import Producto, Movimiento
-from .serializers import ProductoSerializer
-from .services import registrar_producto, obtener_productos, recalcular_productos
+from inventory.models import Producto, Movimiento
+from inventory.api.serializers import ProductoSerializer
+from inventory.services import registrar_producto, obtener_productos, recalcular_productos
+from inventory.repositories import productos_con_stock_total
 from ml.baseline import predict_next_month_from_series
-
-# === IMPORTS NUEVOS (ML con clima/salud + rankings) ===
 from ml.linear_daily import forecast_daily
-from .repositories import productos_con_stock_total
 
 
 class ProductoListCreateView(generics.ListCreateAPIView):
@@ -30,7 +27,7 @@ class ProductoListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Producto.objects.all().order_by("id")
+        qs = Producto.objects.filter(usuario=self.request.user).order_by("id")
         term = self.request.query_params.get("search") or self.request.query_params.get("q")
         if term:
             t = term.strip()
@@ -46,13 +43,14 @@ class ProductoListCreateView(generics.ListCreateAPIView):
         if not ser.is_valid():
             return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
-            producto = registrar_producto(ser.validated_data)
+            producto = registrar_producto(ser.validated_data, request.user)
         except IntegrityError:
             return Response({"codigo": ["El código ya existe."]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(ProductoSerializer(producto).data, status=status.HTTP_201_CREATED)
 
 
 class RecalcularProductosView(APIView):
+    """POST /api/inventory/productos/recalcular"""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -67,9 +65,12 @@ class ProductoDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH  /api/inventory/productos/<pk>
     DELETE /api/inventory/productos/<pk>
     """
-    queryset = Producto.objects.all()
     serializer_class = ProductoSerializer
     lookup_field = "pk"
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Producto.objects.filter(usuario=self.request.user)
 
 
 class ProductoForecastView(APIView):
@@ -101,9 +102,6 @@ class ProductoForecastView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-# =========================
-# NUEVO: Pronóstico diario ML (lags + clima Pasto + salud Nariño + Carnaval)
-# =========================
 class ProductoForecastDailyView(APIView):
     """
     GET /api/inventory/productos/<pk>/forecast_daily?h=14
@@ -111,7 +109,7 @@ class ProductoForecastDailyView(APIView):
     - yhat_total: suma pronosticada para h días
     - rmse: error reciente
     - safety: stock de seguridad (por ABC)
-    - explicacion_top: top-3 factores (ej: health_idx, precip_sum, ma7)
+    - explicacion_top: top-3 factores
     - serie: [{date, yhat}] para h días
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -134,14 +132,11 @@ class ProductoForecastDailyView(APIView):
             "yhat_total": int(round(res.yhat_total)),
             "rmse": round(res.rmse, 2),
             "safety": int(res.safety),
-            "explicacion_top": res.top,  # propiedad del dataclass (mapea top_factors)
+            "explicacion_top": res.top,
             "serie": res.serie,
         }, status=status.HTTP_200_OK)
 
 
-# =========================
-# NUEVO: Ranking por impacto de salud (qué se vendería más por picos epidemiológicos)
-# =========================
 class ProductosTopPorSaludView(APIView):
     """
     GET /api/inventory/forecast/top_by_health?h=14&n=10
@@ -157,7 +152,6 @@ class ProductosTopPorSaludView(APIView):
             return Response({"detail": "Parámetros inválidos."}, status=status.HTTP_400_BAD_REQUEST)
 
         items = []
-        # productos_con_stock_total() debe anotar stock_total
         for p in productos_con_stock_total().values("id", "nombre", "categoria"):
             res = forecast_daily(producto_id=p["id"], h=h, abc=(p["categoria"] or "C"))
             impact_salud = 0.0
@@ -180,8 +174,6 @@ class ProductoRopSugerirView(APIView):
     """
     GET /api/inventory/productos/<pk>/rop_sugerir?lookback=90&lead_time=5&ss=0
     Calcula: ROP = promedio_diario * lead_time + stock_seguridad
-    - promedio_diario se estima con salidas de los últimos 'lookback' días.
-    - lead_time y stock_seguridad (ss) vienen por query params (enteros).
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -189,7 +181,7 @@ class ProductoRopSugerirView(APIView):
         try:
             lookback = int(request.query_params.get("lookback", 90))
             lead_time = int(request.query_params.get("lead_time", 5))
-            ss = int(request.query_params.get("ss", 0))  # stock de seguridad en unidades
+            ss = int(request.query_params.get("ss", 0))
         except ValueError:
             return Response({"detail": "Parámetros inválidos."}, status=status.HTTP_400_BAD_REQUEST)
 

@@ -6,7 +6,7 @@ import {
   crearVentaUnit,
   getCierreDia,
   listarLotes,
-  listarVentasHoy,
+  listarVentasHoy
 } from "../repository";
 
 import "../../../styles/ventas.css"; // << importante
@@ -35,6 +35,7 @@ export default function RegistrarVentaPage() {
   // ------- LISTA DEL DÍA -------
   const [ventas, setVentas] = useState([]);
   const [totalDia, setTotalDia] = useState(0);
+  const [historialMensual, setHistorialMensual] = useState([]);
 
   const doSuggest = debounce(async (txt) => {
     const q = (txt || "").trim();
@@ -66,6 +67,8 @@ export default function RegistrarVentaPage() {
       setVentas(vs || []);
       const c = await getCierreDia();
       setTotalDia(Number(c?.total_dia ?? 0));
+      const hist = await getHistorialMensual();
+      setHistorialMensual(hist || []);
     } catch { /* noop */ }
   };
   useEffect(() => { loadDia(); }, []);
@@ -110,6 +113,7 @@ export default function RegistrarVentaPage() {
 
   const registrarVenta = async () => {
     if (!productoSel?.id) { alert("Selecciona un producto."); return; }
+    if (Number(precio) < 500) { alert("El precio debe ser al menos 500 COP"); return; }
     if (Number(cantidad) <= 0) { alert("Cantidad debe ser > 0"); return; }
 
     if (loteMode === "manual" && loteId) {
@@ -135,14 +139,14 @@ export default function RegistrarVentaPage() {
       alert(`Venta #${v.id} registrada. Total $${money(v.total)}`);
     } catch (e) {
       console.error(e);
-      alert(e?.payload?.detail || "Error al registrar la venta");
+      alert(e?.response?.data?.detail || "Error al registrar la venta");
     }
   };
 
   const doAnular = async (ventaId) => {
     if (!confirm(`¿Anular la venta #${ventaId}?`)) return;
     try { await anularVenta(ventaId); await loadDia(); }
-    catch { alert("No se pudo anular la venta."); }
+    catch (e) { alert(e?.response?.data?.detail || "No se pudo anular la venta."); }
   };
 
   return (
@@ -211,7 +215,7 @@ export default function RegistrarVentaPage() {
             <span className="tiny">$ Unidad</span>
             <input
               type="number"
-              min={0}
+              min={500}
               value={precio}
               onChange={(e) => setPrecio(e.target.value)}
               className="text-right"
@@ -308,6 +312,31 @@ export default function RegistrarVentaPage() {
         >
           Cierre del día
         </button>
+      </div>
+
+      {/* HISTORIAL MENSUAL */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: 12 }}>Historial de Ventas por Mes</h2>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th scope="col">Mes</th>
+                <th scope="col" className="text-right">Total Vendido</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historialMensual.length === 0 ? (
+                <tr><td className="muted" colSpan={2}>No hay historial este año</td></tr>
+              ) : historialMensual.map(m => (
+                <tr key={m.mes_num}>
+                  <td>{m.mes}</td>
+                  <td className="text-right"><b>${money(m.total)}</b></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

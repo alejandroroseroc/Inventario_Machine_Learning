@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import "../../../styles/productos.css";
 import ProductoForm from "../components/ProductoForm";
@@ -9,8 +9,11 @@ export default function ProductosPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
+  const fileInputRef = useRef(null);
+
 
   async function load() {
     setLoading(true); setError(""); setOk("");
@@ -27,12 +30,47 @@ export default function ProductosPage() {
     finally { setCreating(false); }
   }
 
+  async function handleImport(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true); setError(""); setOk("");
+    try {
+      const res = await importarCSV(file);
+      setOk(res.message || `Se importaron ${res.count} registros.`);
+      await load();
+    } catch (e) {
+      setError(e?.message || "Error al importar el archivo CSV.");
+    } finally {
+      setImporting(false);
+      e.target.value = ""; // Reset input
+    }
+  }
+
   return (
     <div className="page page--productos">
       <div className="page__head">
         <h2 className="page__title" id="pf_title">Inventario</h2>
-        <Link to="/panel" className="link-back">← Volver al Panel</Link>
+
+        <div className="page__actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <input
+            type="file"
+            accept=".csv"
+            ref={fileInputRef}
+            onChange={handleImport}
+            style={{ display: 'none' }}
+          />
+          <button
+            className="btn btn--secondary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+          >
+            {importing ? "Importando..." : "📁 Importar CSV"}
+          </button>
+          <Link to="/panel" className="link-back">← Volver al Panel</Link>
+        </div>
       </div>
+
 
       <section className="help" aria-labelledby="ayuda_inv_titulo">
         <h3 id="ayuda_inv_titulo">¿Cómo registrar un medicamento?</h3>

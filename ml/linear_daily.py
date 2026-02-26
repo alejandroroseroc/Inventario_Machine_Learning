@@ -1,4 +1,8 @@
 # ml/linear_daily.py
+# Modelo de pronóstico diario de demanda para droguería.
+# Features: lags de ventas, MA7, día de semana.
+# Basado únicamente en las ventas históricas de la droguería.
+
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta, date
@@ -11,9 +15,6 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from inventory.models import Movimiento
-from .calendar_co import is_carnaval
-from .weather_pasto import fetch_weather_daily
-from .health_ni import fetch_health_daily
 
 
 @dataclass
@@ -55,54 +56,13 @@ def _daily_series(producto_id: int, lookback_days: int = 180) -> list:
     return rows
 
 
-def _merge_external(rows: list) -> list:
-    """Merge datos externos con tolerancia total a fallos"""
-    if not rows:
-        return rows
-        
-    start, end = rows[0]["date"], rows[-1]["date"]
-    
-    # Obtener datos externos con manejo de errores
-    weather, health = {}, {}
-    
-    try:
-        weather = fetch_weather_daily(start, end)
-        print(f"✓ Clima obtenido: {len(weather)} días")
-    except Exception as e:
-        print(f"✗ Clima falló: {e}")
-        # Crear datos por defecto
-        current = start
-        while current <= end:
-            weather[current.isoformat()] = {"temp_mean": 18.0, "precip_sum": 2.5}
-            current += timedelta(days=1)
-    
-    try:
-        health = fetch_health_daily(start, end)
-        print(f"✓ Salud obtenido: {len(health)} días")
-    except Exception as e:
-        print(f"✗ Salud falló: {e}")
-        # Crear datos por defecto
-        current = start
-        while current <= end:
-            health[current.isoformat()] = {"health_idx": 0.5}
-            current += timedelta(days=1)
-    
-    # Merge seguro
-    out = []
-    for r in rows:
-        k = r["date"].isoformat()
-        r2 = dict(r)
-        r2.update(weather.get(k, {"temp_mean": 18.0, "precip_sum": 2.5}))
-        r2.update(health.get(k, {"health_idx": 0.5}))
-        out.append(r2)
-    
-    return out
-
-
 def _build_matrix(rows: list):
     """
-    Features:
-        y_lag1, y_lag7, MA7, dummies DOW(1..6) [0 baseline], carnaval, temp_mean, precip_sum, health_idx
+    Construye la matriz de features para el modelo lineal.
+
+    Features (9 en total):
+        lag1, lag7, MA7,
+        dummies DOW (1..6) [0=Lunes es baseline]
     """
     X, Y, dates = [], [], []
     for i in range(len(rows)):
@@ -114,22 +74,17 @@ def _build_matrix(rows: list):
         y_lag1 = rows[i - 1]["y"]
         y_lag7 = rows[i - 7]["y"]
         ma7 = sum(r["y"] for r in rows[i - 7:i]) / 7.0
-        dow = d.weekday()  # 0..6
-        dummies = [1 if dow == k else 0 for k in range(1, 7)]  # 6 dummies, 0 es baseline
+        dow = d.weekday()                                        # 0..6
+        dummies = [1 if dow == k else 0 for k in range(1, 7)]   # 6 dummies
 
-        temp_mean = float(rows[i].get("temp_mean", 0.0))
-        precip_sum = float(rows[i].get("precip_sum", 0.0))
-        health_idx = float(rows[i].get("health_idx", 0.0))
-
-        x = [y_lag1, y_lag7, ma7] + dummies + [int(is_carnaval(d)), temp_mean, precip_sum, health_idx]
+        x = [y_lag1, y_lag7, ma7] + dummies
         X.append(x)
         Y.append(y)
         dates.append(d)
 
     feature_names = (
         ["lag1", "lag7", "ma7"] +
-        [f"dow_{k}" for k in range(1, 7)] +
-        ["carnaval", "temp_mean", "precip_sum", "health_idx"]
+        [f"dow_{k}" for k in range(1, 7)]
     )
     return np.array(X, dtype=float), np.array(Y, dtype=float), dates, feature_names
 
@@ -142,8 +97,8 @@ def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 def _predict_iterative(model: LinearRegression, hist_rows: list, feature_names: list, h: int):
     """
-    Predice día a día para horizonte h, recalculando lag/MA7 con predicciones.
-    Devuelve serie y contribuciones acumuladas por feature.
+    Predice día a día para horizonte h, recalculando lag/MA7 con predicciones anteriores.
+    Devuelve (serie, contribuciones_acumuladas_por_feature).
     """
     serie = []
     contrib_sum = np.zeros(len(feature_names), dtype=float)
@@ -153,44 +108,55 @@ def _predict_iterative(model: LinearRegression, hist_rows: list, feature_names: 
         d = hist_rows[-1]["date"] + timedelta(days=1)
 
         if i < 7:
-            x = [hist_rows[-1]["y"], 0, hist_rows[-1]["y"]] + [0] * 6 + [0, 0.0, 0.0, 0.0]
+            x = [hist_rows[-1]["y"], 0, hist_rows[-1]["y"]] + [0] * 6
         else:
             y_lag1 = hist_rows[-1]["y"]
             y_lag7 = hist_rows[-7]["y"]
             ma7 = sum(r["y"] for r in hist_rows[-7:]) / 7.0
             dow = d.weekday()
             dummies = [1 if dow == k else 0 for k in range(1, 7)]
-            # Usar último valor observado de exógenas
-            last = hist_rows[-1]
-            temp_mean = float(last.get("temp_mean", 0.0))
-            precip_sum = float(last.get("precip_sum", 0.0))
-            health_idx = float(last.get("health_idx", 0.0))
-            x = [y_lag1, y_lag7, ma7] + dummies + [int(is_carnaval(d)), temp_mean, precip_sum, health_idx]
+            x = [y_lag1, y_lag7, ma7] + dummies
 
         yhat = float(model.predict([x])[0])
 
         if hasattr(model, "coef_"):
-            contrib_sum += (model.coef_ * np.array(x, dtype=float))
+            contrib_sum += model.coef_ * np.array(x, dtype=float)
 
-        serie.append({"date": d.isoformat(), "yhat": max(0.0, yhat)})
+        yhat_clipped = max(0.0, yhat)
+        serie.append({"date": d.isoformat(), "yhat": yhat_clipped})
 
         hist_rows.append({
             "date": d,
-            "y": max(0.0, yhat),
-            "temp_mean": x[-3],
-            "precip_sum": x[-2],
-            "health_idx": x[-1],
+            "y": yhat_clipped,
         })
 
     return serie, contrib_sum
 
 
-def forecast_daily(producto_id: int, h: int = 14, lookback_days: int = 180, abc: Optional[str] = None) -> ForecastResult:
+def forecast_daily(
+    producto_id: int,
+    h: int = 14,
+    lookback_days: int = 180,
+    abc: Optional[str] = None,
+) -> ForecastResult:
+    """
+    Pronóstico diario de demanda para un producto.
+    Usa únicamente las ventas históricas de la droguería.
+
+    Args:
+        producto_id:   ID del producto en la BD
+        h:             Horizonte de predicción en días
+        lookback_days: Días históricos usados para entrenamiento
+        abc:           Categoría del producto (A/B/C) — ajusta el stock de seguridad
+
+    Returns:
+        ForecastResult con yhat_total, rmse, safety, serie diaria y top features.
+    """
     try:
-        rows = _merge_external(_daily_series(producto_id, lookback_days))
+        rows = _daily_series(producto_id, lookback_days)
         X, Y, dates, feature_names = _build_matrix(rows)
 
-        if len(Y) < 10:  # Reducido el mínimo para más flexibilidad
+        if len(Y) < 10:
             return ForecastResult(
                 yhat_total=0,
                 rmse=0,
@@ -201,11 +167,12 @@ def forecast_daily(producto_id: int, h: int = 14, lookback_days: int = 180, abc:
 
         model = LinearRegression().fit(X, Y)
 
-        val_k = min(14, len(Y))  # Reducido para datasets pequeños
+        val_k = min(14, len(Y))
         y_pred = model.predict(X[-val_k:])
         rmse = _rmse(Y[-val_k:], y_pred)
 
-        cat = (abc or "C")
+        # Stock de seguridad ajustado por categoría ABC
+        cat = abc or "C"
         z = 1.64 if cat == "A" else (1.28 if cat == "B" else 0.84)
         safety = int(np.ceil(z * rmse))
 
@@ -213,21 +180,20 @@ def forecast_daily(producto_id: int, h: int = 14, lookback_days: int = 180, abc:
         serie, contrib_sum = _predict_iterative(model, hist_copy, feature_names, h)
         yhat_total = float(sum(s["yhat"] for s in serie))
 
-        # Mejorar cálculo de factores importantes (usar valor absoluto)
         top_pairs = sorted(
             [{"factor": fn, "impacto": float(abs(v))} for fn, v in zip(feature_names, contrib_sum)],
             key=lambda x: x["impacto"],
             reverse=True,
         )
-        top = top_pairs[:3]
 
         return ForecastResult(
             yhat_total=yhat_total,
             rmse=rmse,
             safety=safety,
             serie=serie,
-            top_factors=top,
+            top_factors=top_pairs[:3],
         )
+
     except Exception as e:
         print(f"Error en forecast_daily para producto {producto_id}: {e}")
         return ForecastResult(

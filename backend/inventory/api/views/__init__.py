@@ -5,7 +5,6 @@ from .productos import (
     ProductoForecastView,
     ProductoForecastDailyView,
     ProductoRopSugerirView,
-    ProductosTopPorSaludView,
 )
 from .lotes import LoteListCreateView, LotesPorVencerView
 from .movimientos import MovimientoListCreateView
@@ -27,7 +26,6 @@ __all__ = [
     "ProductoForecastView",
     "ProductoForecastDailyView",
     "ProductoRopSugerirView",
-    "ProductosTopPorSaludView",
     # Lotes
     "LoteListCreateView",
     "LotesPorVencerView",

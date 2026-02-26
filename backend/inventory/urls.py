@@ -8,7 +8,6 @@ from .api.views import (
     ProductoForecastView,
     ProductoRopSugerirView,
     ProductoForecastDailyView,
-    ProductosTopPorSaludView,
     LoteListCreateView,
     LotesPorVencerView,
     MovimientoListCreateView,
@@ -53,9 +52,6 @@ urlpatterns = [
     path("inventory/ventas/<int:pk>", VentaDetailView.as_view(), name="ventas-detail"),
     path("inventory/ventas/cierre", VentaCierreDiaView.as_view(), name="ventas-cierre"),
     path("inventory/ventas/historial-mensual", VentaMonthlyHistoryView.as_view(), name="ventas-historial-mensual"),
-
-    # Analítica
-    path("inventory/forecast/top_by_health", ProductosTopPorSaludView.as_view(), name="forecast-top-by-health"),
 
     # Imports
     path("inventory/import-csv", CSVImportView.as_view(), name="import-csv"),

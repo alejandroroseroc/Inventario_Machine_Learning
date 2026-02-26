@@ -13,7 +13,6 @@ from math import ceil
 from inventory.models import Producto, Movimiento
 from inventory.api.serializers import ProductoSerializer
 from inventory.services import registrar_producto, obtener_productos, recalcular_productos
-from inventory.repositories import productos_con_stock_total
 from ml.baseline import predict_next_month_from_series
 from ml.linear_daily import forecast_daily
 
@@ -135,39 +134,6 @@ class ProductoForecastDailyView(APIView):
             "explicacion_top": res.top,
             "serie": res.serie,
         }, status=status.HTTP_200_OK)
-
-
-class ProductosTopPorSaludView(APIView):
-    """
-    GET /api/inventory/forecast/top_by_health?h=14&n=10
-    Lista los N productos con mayor impacto positivo de 'health_idx' en el horizonte h.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        try:
-            h = int(request.query_params.get("h", 14))
-            n = int(request.query_params.get("n", 10))
-        except ValueError:
-            return Response({"detail": "Parámetros inválidos."}, status=status.HTTP_400_BAD_REQUEST)
-
-        items = []
-        for p in productos_con_stock_total().values("id", "nombre", "categoria"):
-            res = forecast_daily(producto_id=p["id"], h=h, abc=(p["categoria"] or "C"))
-            impact_salud = 0.0
-            for kv in res.top:
-                if kv.get("factor") == "health_idx":
-                    impact_salud = float(kv.get("impacto", 0.0))
-                    break
-            items.append({
-                "producto_id": p["id"],
-                "nombre": p["nombre"],
-                "impacto_salud": round(impact_salud, 2),
-                "yhat_total": int(round(res.yhat_total)),
-            })
-
-        items.sort(key=lambda x: x["impacto_salud"], reverse=True)
-        return Response({"h": h, "items": items[:n]}, status=status.HTTP_200_OK)
 
 
 class ProductoRopSugerirView(APIView):

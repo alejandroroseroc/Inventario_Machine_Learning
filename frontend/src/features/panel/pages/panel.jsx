@@ -43,11 +43,11 @@ export default function Panel() {
     return () => { live = false; };
   }, []);
 
-  const valor     = data?.valor_total ?? 0;
+  const valor = data?.valor_total ?? 0;
   // tolerante a posible typo del backend: porcentaje_riticos
-  const criticos  = data?.porcentaje_criticos ?? data?.porcentaje_riticos ?? 0;
+  const criticos = data?.porcentaje_criticos ?? data?.porcentaje_riticos ?? 0;
   const porVencer = data?.por_vencer ?? 0;
-  const eventos   = data?.transacciones_recientes ?? [];
+  const eventos = data?.transacciones_recientes ?? [];
 
   return (
     <div className="panel-wrap">

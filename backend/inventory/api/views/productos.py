@@ -105,11 +105,10 @@ class ProductoForecastDailyView(APIView):
     """
     GET /api/inventory/productos/<pk>/forecast_daily?h=14
     Retorna:
-    - yhat_total: suma pronosticada para h días
-    - rmse: error reciente
-    - safety: stock de seguridad (por ABC)
+    - metricas: {modelo, r2, mae, rmse, safety}
+    - historico: [{date, y_real}] últimos 30 días
+    - prediccion: [{date, yhat, yhat_lower, yhat_upper}] para h días
     - explicacion_top: top-3 factores
-    - serie: [{date, yhat}] para h días
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -125,14 +124,32 @@ class ProductoForecastDailyView(APIView):
             return Response({"detail": "Producto no existe."}, status=status.HTTP_404_NOT_FOUND)
 
         res = forecast_daily(producto_id=p.id, h=h, abc=(p.categoria or "C"))
+
+        # Construir prediccion con bandas de error (±MAE)
+        mae = res.mae
+        prediccion = []
+        for s in res.serie:
+            yhat = s["yhat"]
+            prediccion.append({
+                "date": s["date"],
+                "yhat": round(yhat, 2),
+                "yhat_lower": round(max(0, yhat - mae), 2),
+                "yhat_upper": round(yhat + mae, 2),
+            })
+
         return Response({
             "producto": p.id,
             "h": h,
-            "yhat_total": int(round(res.yhat_total)),
-            "rmse": round(res.rmse, 2),
-            "safety": int(res.safety),
+            "metricas": {
+                "modelo": res.modelo,
+                "r2": round(res.r2, 4),
+                "mae": round(res.mae, 2),
+                "rmse": round(res.rmse, 2),
+                "safety": int(res.safety),
+            },
+            "historico": res.historico,
+            "prediccion": prediccion,
             "explicacion_top": res.top,
-            "serie": res.serie,
         }, status=status.HTTP_200_OK)
 
 

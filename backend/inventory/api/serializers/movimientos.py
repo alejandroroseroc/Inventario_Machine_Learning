@@ -25,6 +25,19 @@ class MovimientoCreateSerializer(serializers.Serializer):
     fecha_caducidad = serializers.DateField(required=False, allow_null=True)
     motivo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
+    def validate(self, attrs):
+        tipo = attrs.get("tipo")
+        lote_id = attrs.get("lote")
+        fecha_cad = attrs.get("fecha_caducidad")
+
+        # Salidas y ajustes negativos requieren lote (FEFO automático lo asigna internamente)
+        # Entradas requieren lote_id O fecha_caducidad (para crear lote nuevo)
+        if tipo == "entrada" and not lote_id and not fecha_cad:
+            raise serializers.ValidationError(
+                {"lote": "Para ENTRADA envía 'lote' o 'fecha_caducidad' para crear lote."}
+            )
+        return attrs
+
     def create(self, validated_data):
         req = self.context["request"]
         from inventory.services import registrar_movimiento, MovimientoValidationError, StockError

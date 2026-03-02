@@ -2,11 +2,12 @@
 # Modelo de pronóstico diario de demanda para droguería.
 # Features: lags de ventas, MA7, día de semana.
 # Basado únicamente en las ventas históricas de la droguería.
+# Auto-selecciona entre LinearRegression y XGBoost (menor RMSE).
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta, date
-from typing import Optional
+from typing import Optional, List
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
@@ -15,22 +16,35 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from inventory.models import Movimiento
+from ml.model_engine import train_and_select
+
+# ── Whitelist de features permitidos ─────────────────────────────────────
+ALLOWED_FEATURES = {"lag1", "lag7", "ma7"} | {f"dow_{k}" for k in range(1, 7)}
+
+FEATURE_NAMES = (
+    ["lag1", "lag7", "ma7"] +
+    [f"dow_{k}" for k in range(1, 7)]
+)
 
 
 @dataclass
 class ForecastResult:
     yhat_total: float
     rmse: float
-    safety: int
-    serie: list          # lista de {"date": ISO, "yhat": float}
-    top_factors: list    # lista de {"factor": str, "impacto": float}
+    r2: float = 0.0           # Coeficiente de determinación
+    mae: float = 0.0          # Error absoluto medio
+    modelo: str = "linear"    # "linear" o "xgboost"
+    safety: int = 0
+    serie: list = field(default_factory=list)        # [{date: ISO, yhat: float}]
+    historico: list = field(default_factory=list)     # [{date: ISO, y_real: int}]
+    top_factors: list = field(default_factory=list)   # [{factor: str, impacto: float}]
 
     @property
     def top(self) -> list:
         return self.top_factors
 
 
-def _daily_series(producto_id: int, lookback_days: int = 180) -> list:
+def daily_series(producto_id: int, lookback_days: int = 180) -> list:
     """[{date, y}] ventas diarias (0 si no hubo venta) en ventana de entrenamiento."""
     hoy = timezone.localdate()
     ini = hoy - timedelta(days=lookback_days)
@@ -56,9 +70,9 @@ def _daily_series(producto_id: int, lookback_days: int = 180) -> list:
     return rows
 
 
-def _build_matrix(rows: list):
+def build_matrix(rows: list):
     """
-    Construye la matriz de features para el modelo lineal.
+    Construye la matriz de features para el modelo.
 
     Features (9 en total):
         lag1, lag7, MA7,
@@ -82,20 +96,10 @@ def _build_matrix(rows: list):
         Y.append(y)
         dates.append(d)
 
-    feature_names = (
-        ["lag1", "lag7", "ma7"] +
-        [f"dow_{k}" for k in range(1, 7)]
-    )
-    return np.array(X, dtype=float), np.array(Y, dtype=float), dates, feature_names
+    return np.array(X, dtype=float), np.array(Y, dtype=float), dates, FEATURE_NAMES
 
 
-def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    if len(y_true) == 0:
-        return 0.0
-    return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
-
-
-def _predict_iterative(model: LinearRegression, hist_rows: list, feature_names: list, h: int):
+def _predict_iterative(model, hist_rows: list, feature_names: list, h: int):
     """
     Predice día a día para horizonte h, recalculando lag/MA7 con predicciones anteriores.
     Devuelve (serie, contribuciones_acumuladas_por_feature).
@@ -117,13 +121,14 @@ def _predict_iterative(model: LinearRegression, hist_rows: list, feature_names: 
             dummies = [1 if dow == k else 0 for k in range(1, 7)]
             x = [y_lag1, y_lag7, ma7] + dummies
 
-        yhat = float(model.predict([x])[0])
+        x_arr = np.array([x], dtype=float)
+        yhat = float(model.predict(x_arr)[0])
 
         if hasattr(model, "coef_"):
             contrib_sum += model.coef_ * np.array(x, dtype=float)
 
         yhat_clipped = max(0.0, yhat)
-        serie.append({"date": d.isoformat(), "yhat": yhat_clipped})
+        serie.append({"date": d.isoformat(), "yhat": round(yhat_clipped, 2)})
 
         hist_rows.append({
             "date": d,
@@ -142,6 +147,7 @@ def forecast_daily(
     """
     Pronóstico diario de demanda para un producto.
     Usa únicamente las ventas históricas de la droguería.
+    Auto-selecciona LinearRegression vs XGBoost por RMSE más bajo.
 
     Args:
         producto_id:   ID del producto en la BD
@@ -150,47 +156,82 @@ def forecast_daily(
         abc:           Categoría del producto (A/B/C) — ajusta el stock de seguridad
 
     Returns:
-        ForecastResult con yhat_total, rmse, safety, serie diaria y top features.
+        ForecastResult con yhat_total, métricas (r2, mae, rmse), safety, serie y top features.
     """
     try:
-        rows = _daily_series(producto_id, lookback_days)
-        X, Y, dates, feature_names = _build_matrix(rows)
+        rows = daily_series(producto_id, lookback_days)
+        X, Y, dates, feature_names = build_matrix(rows)
 
-        if len(Y) < 10:
+        if len(Y) < 10 or np.sum(Y) == 0:
+            historico = [{"date": r["date"].isoformat(), "y_real": r["y"]} for r in rows[-30:]]
             return ForecastResult(
                 yhat_total=0,
                 rmse=0,
+                r2=0,
+                mae=0,
+                modelo="insuficiente",
                 safety=0,
                 serie=[],
+                historico=historico,
                 top_factors=[{"factor": "insuficientes_datos", "impacto": 0}]
             )
 
-        model = LinearRegression().fit(X, Y)
-
+        # ── Entrenar y seleccionar mejor modelo ─────────────────────────
         val_k = min(14, len(Y))
-        y_pred = model.predict(X[-val_k:])
-        rmse = _rmse(Y[-val_k:], y_pred)
+        X_train, Y_train = X[:-val_k], Y[:-val_k]
+        X_val, Y_val = X[-val_k:], Y[-val_k:]
+
+        # Al menos 10 puntos de entrenamiento
+        if len(Y_train) < 10:
+            X_train, Y_train = X, Y
+            X_val, Y_val = X[-val_k:], Y[-val_k:]
+
+        result = train_and_select(X_train, Y_train, X_val, Y_val)
+        model = result["model"]
+        modelo_nombre = result["modelo"]
+        r2 = result["r2"]
+        mae = result["mae"]
+        rmse = result["rmse"]
 
         # Stock de seguridad ajustado por categoría ABC
         cat = abc or "C"
         z = 1.64 if cat == "A" else (1.28 if cat == "B" else 0.84)
         safety = int(np.ceil(z * rmse))
 
+        # ── Predicción iterativa ────────────────────────────────────────
         hist_copy = rows.copy()
         serie, contrib_sum = _predict_iterative(model, hist_copy, feature_names, h)
         yhat_total = float(sum(s["yhat"] for s in serie))
 
-        top_pairs = sorted(
-            [{"factor": fn, "impacto": float(abs(v))} for fn, v in zip(feature_names, contrib_sum)],
-            key=lambda x: x["impacto"],
-            reverse=True,
-        )
+        # ── Top factores ────────────────────────────────────────────────
+        if hasattr(model, "coef_"):
+            top_pairs = sorted(
+                [{"factor": fn, "impacto": float(abs(v))} for fn, v in zip(feature_names, contrib_sum)],
+                key=lambda x: x["impacto"],
+                reverse=True,
+            )
+        elif hasattr(model, "feature_importances_"):
+            importances = model.feature_importances_
+            top_pairs = sorted(
+                [{"factor": fn, "impacto": float(v)} for fn, v in zip(feature_names, importances)],
+                key=lambda x: x["impacto"],
+                reverse=True,
+            )
+        else:
+            top_pairs = [{"factor": "tendencia", "impacto": 0}]
+
+        # ── Histórico para gráfica ──────────────────────────────────────
+        historico = [{"date": r["date"].isoformat(), "y_real": r["y"]} for r in rows[-30:]]
 
         return ForecastResult(
             yhat_total=yhat_total,
             rmse=rmse,
+            r2=r2,
+            mae=mae,
+            modelo=modelo_nombre,
             safety=safety,
             serie=serie,
+            historico=historico,
             top_factors=top_pairs[:3],
         )
 
@@ -199,7 +240,11 @@ def forecast_daily(
         return ForecastResult(
             yhat_total=0,
             rmse=0,
+            r2=0,
+            mae=0,
+            modelo="error",
             safety=0,
             serie=[],
+            historico=[],
             top_factors=[{"factor": "error", "impacto": 0}]
         )

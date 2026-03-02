@@ -72,9 +72,9 @@ DATABASES = {
         "NAME": DB_NAME,
         # Puedes dejar estos fijos o también sacarlos de variables de entorno
         "USER": os.environ.get("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "2018"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "1122"),
         "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5433"),
     }
 }
 

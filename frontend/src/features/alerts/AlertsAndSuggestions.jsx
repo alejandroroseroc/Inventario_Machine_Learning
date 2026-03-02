@@ -4,13 +4,9 @@ import { AlertsService } from "../../api/alerts.service";
 import { listLotesPorVencer } from "../lotes/repository";
 
 const factorLabel = (f) => {
-  if (f === "health_idx") return "Salud (IRA/ETI)";
-  if (f === "temp_mean") return "Temperatura";
-  if (f === "precip_sum") return "Lluvia";
   if (f === "ma7") return "Tendencia (MA7)";
   if (f === "lag1") return "Últ. día";
   if (f === "lag7") return "Hace 1 semana";
-  if (f === "carnaval") return "Carnaval";
   if (typeof f === "string" && f.startsWith("dow_")) {
     const k = parseInt(f.split("_")[1], 10);
     const map = { 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb" };
@@ -23,10 +19,6 @@ const reasonText = (a) => {
   const top = a?.explicacion?.top || [];
   if (!top.length) return "Estimación de demanda";
   const first = top[0]?.factor;
-  if (first === "health_idx") return "Demanda por picos de salud";
-  if (first === "temp_mean") return "Condiciones de temperatura";
-  if (first === "precip_sum") return "Temporada de lluvias";
-  if (first === "carnaval") return "Carnaval de Pasto";
   if (first === "ma7") return "Tendencia ascendente";
   if (first === "lag1" || first === "lag7") return "Patrón histórico";
   if (typeof first === "string" && first.startsWith("dow_")) {
@@ -77,7 +69,7 @@ export default function AlertsAndSuggestions() {
       // Cargar lotes por vencer
       const lotesRaw = await listLotesPorVencer({ dias: diasVenc });
       console.log("Lotes crudos:", lotesRaw); // DEBUG
-      
+
       const lotes = asArray(lotesRaw).map((x) => ({
         id: x.lote_id || x.id,
         productoNombre: x.producto_nombre || x.producto?.nombre || "-",
@@ -90,7 +82,7 @@ export default function AlertsAndSuggestions() {
       // Cargar alertas
       const alerts = await AlertsService.list({ estado });
       console.log("Alertas crudas:", alerts); // DEBUG
-      
+
       const mlOnly = alerts.filter((a) => a?.explicacion && Array.isArray(a.explicacion.top));
 
       setExpiring(lotes);
@@ -154,51 +146,146 @@ export default function AlertsAndSuggestions() {
       (mlAlerts || []).map((a) => {
         const cant = parseSuggestedUnits(a.mensaje);
         const explicacion = a.explicacion || {};
-        
+        const r2 = explicacion.r2;
+        const mae = explicacion.mae;
+        const rmse = explicacion.rmse;
+        const modelo = explicacion.modelo;
+
+        // Semáforo R²
+        const pct = r2 != null ? Math.max(0, Math.min(100, Math.round(r2 * 100))) : null;
+        let barColor = '#e74c3c', confLabel = 'Baja confianza';
+        if (r2 != null) {
+          if (r2 > 0.95) { barColor = '#e67e22'; confLabel = 'Posible overfitting'; }
+          else if (r2 >= 0.80) { barColor = '#27ae60'; confLabel = 'Alta confianza'; }
+          else if (r2 >= 0.60) { barColor = '#f39c12'; confLabel = 'Confianza moderada'; }
+        }
+        const modelLabel = modelo === 'xgboost' ? 'XGBoost' : 'Reg. Lineal';
+
+        // Identificador: priorizar código de barras
+        const barcode = a.producto_codigo_barras;
+        const idDisplay = barcode || a.producto_codigo || 'Sin ID';
+
         return (
           <tr key={a.id}>
+            {/* ── MEDICAMENTO ── */}
             <td>
               <div>
-                <strong style={{ fontSize: '1.1rem', color: '#000', display: 'block', marginBottom: '4px' }}>
-                  {/* CORREGIDO: Usar producto_nombre del backend */}
-                  {a.producto_nombre || a.productoNombre || "Nombre no disponible"}
+                <strong style={{ fontSize: '1.05rem', color: '#111', display: 'block', marginBottom: '2px' }}>
+                  {a.producto_nombre || a.productoNombre || 'Nombre no disponible'}
                 </strong>
-                <div style={{ fontSize: '0.875rem', color: '#666' }}>
-                  Código: {a.producto_codigo || "Sin código"}
-                  {explicacion.yhat_total && ` • Pronóstico: ${Math.round(explicacion.yhat_total)} uds`}
-                  {explicacion.safety && ` • Stock seguridad: ${explicacion.safety} uds`}
+                <div style={{ fontSize: '0.8rem', color: '#555', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{
+                    fontFamily: 'monospace', background: '#f0f0f0', padding: '1px 6px',
+                    borderRadius: '3px', fontSize: '0.78rem', letterSpacing: '0.5px'
+                  }}>
+                    {barcode ? `⊟ ${barcode}` : idDisplay}
+                  </span>
+                  {barcode && a.producto_codigo && (
+                    <span style={{ color: '#999', fontSize: '0.75rem' }}>
+                      Cód: {a.producto_codigo}
+                    </span>
+                  )}
                 </div>
               </div>
             </td>
+
+            {/* ── CANTIDAD SUGERIDA ── */}
             <td>
               <strong style={{ fontSize: '1.1rem', color: '#2c5aa0' }}>
-                {Number.isFinite(cant) ? `${cant} unidades` : a.mensaje}
+                {Number.isFinite(cant) ? `${cant} uds` : a.mensaje}
               </strong>
-            </td>
-            <td>
-              <div className="chips">
-                <span className="chip" style={{ backgroundColor: '#e8f4fd', color: '#000' }}>
-                  {reasonText(a)}
-                </span>
-                {(explicacion.top || []).slice(0, 2).map((t, idx) => (
-                  <span key={idx} className="chip ghost" style={{ color: '#000' }}>
-                    {factorLabel(t.factor)}
-                  </span>
-                ))}
-              </div>
-              {explicacion.rmse && (
-                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '4px' }}>
-                  📊 Error: {explicacion.rmse.toFixed(1)} uds • {explicacion.h || 14}d
+              {explicacion.safety > 0 && (
+                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '2px' }}>
+                  Incl. {explicacion.safety} uds seguridad
                 </div>
               )}
             </td>
+
+            {/* ── ANÁLISIS DE PREDICCIÓN ── */}
+            <td>
+              <div style={{
+                background: '#f8f9fb', border: '1px solid #e8eaed', borderRadius: '8px',
+                padding: '10px 12px', fontSize: '0.82rem'
+              }}>
+                {/* Fila 1: Badge modelo + R² bar */}
+                {pct != null && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                      <span style={{
+                        background: modelo === 'xgboost' ? '#8e44ad' : '#2c5aa0',
+                        color: '#fff', padding: '2px 8px', borderRadius: '4px',
+                        fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.3px'
+                      }}>
+                        {modelLabel}
+                      </span>
+                      <span style={{ fontWeight: 600, color: '#222' }}>
+                        R² {pct}%
+                      </span>
+                      <span style={{ color: barColor, fontWeight: 500, fontSize: '0.75rem' }}>
+                        {confLabel}
+                      </span>
+                    </div>
+                    <div style={{
+                      width: '100%', height: '6px', backgroundColor: '#e0e0e0',
+                      borderRadius: '3px', overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        width: `${pct}%`, height: '100%', backgroundColor: barColor,
+                        borderRadius: '3px', transition: 'width 0.4s ease'
+                      }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Fila 2: Grid MAE / RMSE / Horizonte */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px',
+                  borderTop: pct != null ? '1px solid #e8eaed' : 'none',
+                  paddingTop: pct != null ? '8px' : '0',
+                  marginBottom: '6px'
+                }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#999', textTransform: 'uppercase', marginBottom: '1px' }}>MAE</div>
+                    <div style={{ fontWeight: 600, color: '#333' }}>
+                      {mae != null ? `±${mae.toFixed(1)}` : '—'}
+                      <span style={{ fontSize: '0.7rem', color: '#888' }}> uds</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center', borderLeft: '1px solid #e8eaed', borderRight: '1px solid #e8eaed' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#999', textTransform: 'uppercase', marginBottom: '1px' }}>RMSE</div>
+                    <div style={{ fontWeight: 600, color: '#333' }}>
+                      {rmse != null ? rmse.toFixed(1) : '—'}
+                      <span style={{ fontSize: '0.7rem', color: '#888' }}> uds</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#999', textTransform: 'uppercase', marginBottom: '1px' }}>Horizonte</div>
+                    <div style={{ fontWeight: 600, color: '#333' }}>
+                      {explicacion.h || 14}<span style={{ fontSize: '0.7rem', color: '#888' }}>d</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fila 3: Razón principal */}
+                <div style={{
+                  fontSize: '0.76rem', color: '#666',
+                  borderTop: '1px solid #e8eaed', paddingTop: '6px'
+                }}>
+                  {reasonText(a)}
+                </div>
+              </div>
+            </td>
+
+            {/* ── ESTADO ── */}
             <td>
               <span className="tag tag-blue">Sugerencia ML</span>
             </td>
+
+            {/* ── ACCIONES ── */}
             <td className="text-right">
-              <button 
-                type="button" 
-                className="btn primary" 
+              <button
+                type="button"
+                className="btn primary"
                 onClick={() => onResolve(a.id)}
                 style={{ marginRight: '8px' }}
               >
@@ -336,7 +423,7 @@ export default function AlertsAndSuggestions() {
                   <tr>
                     <th scope="col">MEDICAMENTO</th>
                     <th scope="col">CANTIDAD SUGERIDA</th>
-                    <th scope="col">RAZÓN Y FACTORES</th>
+                    <th scope="col">ANÁLISIS DE PREDICCIÓN</th>
                     <th scope="col">ESTADO</th>
                     <th scope="col" className="text-right">ACCIONES</th>
                   </tr>

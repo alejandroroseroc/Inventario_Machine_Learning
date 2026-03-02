@@ -41,7 +41,7 @@ class Lote(models.Model):
 class Movimiento(models.Model):
     TIPO = (("entrada","entrada"), ("salida","salida"), ("ajuste","ajuste"))
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
-    lote = models.ForeignKey(Lote, null=True, blank=True, on_delete=models.SET_NULL)
+    lote = models.ForeignKey(Lote, on_delete=models.PROTECT)
     usuario = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     tipo = models.CharField(max_length=10, choices=TIPO)
     cantidad = models.IntegerField()

@@ -78,8 +78,10 @@ class AlertasStockRecalcularPredictView(APIView):
             top1 = (res.top or [{"factor": "tendencia"}])[0]["factor"]
             msg = f"Sugerido {sugerido} uds para {h} días"
             explicacion = {
-                "modelo": "linear",
+                "modelo": res.modelo,
                 "h": h,
+                "r2": round(res.r2, 4),
+                "mae": round(res.mae, 2),
                 "rmse": round(res.rmse, 2),
                 "safety": int(res.safety),
                 "top": res.top,

@@ -4,7 +4,9 @@ import "../../../styles/panel.css";
 import { getKpis } from "../api";
 
 import KpiCard from "../components/kpiCard.jsx";
+import MlSummaryCard from "../components/MlSummaryCard.jsx";
 import RecentEvents from "../components/RecentEvents.jsx";
+import SalesChart from "../components/SalesChart.jsx";
 
 function formatCurrency(v) {
   const n = Number(v ?? 0);
@@ -80,8 +82,14 @@ export default function Panel() {
         />
       </section>
 
-      {/* Transacciones recientes */}
-      <RecentEvents items={eventos} loading={loading} />
+      {/* ML Summary Card */}
+      <MlSummaryCard countPorVencer={porVencer} />
+
+      {/* Grid Inferior: Gráfico y Transacciones */}
+      <section className="dashboard-grid">
+        <SalesChart data={data?.ventas_semana} />
+        <RecentEvents items={eventos} loading={loading} />
+      </section>
 
       {/* Error */}
       {error && <div className="error">{error}</div>}

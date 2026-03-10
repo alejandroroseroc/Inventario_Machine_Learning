@@ -5,6 +5,7 @@ import {
   buscarProductos,
   crearVentaUnit,
   getCierreDia,
+  getHistorialPaginado,
   listarLotes,
   listarVentasHoy
 } from "../repository";
@@ -35,7 +36,13 @@ export default function RegistrarVentaPage() {
   // ------- LISTA DEL DÍA -------
   const [ventas, setVentas] = useState([]);
   const [totalDia, setTotalDia] = useState(0);
-  const [historialMensual, setHistorialMensual] = useState([]);
+
+  // ------- HISTORIAL PAGINADO -------
+  const [historialPaginado, setHistorialPaginado] = useState(null);
+  const [histFiltroYear, setHistFiltroYear] = useState(new Date().getFullYear());
+  const [histFiltroMonth, setHistFiltroMonth] = useState("");
+  const [histPage, setHistPage] = useState(1);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
 
   const doSuggest = debounce(async (txt) => {
     const q = (txt || "").trim();
@@ -67,11 +74,23 @@ export default function RegistrarVentaPage() {
       setVentas(vs || []);
       const c = await getCierreDia();
       setTotalDia(Number(c?.total_dia ?? 0));
-      const hist = await getHistorialMensual();
-      setHistorialMensual(hist || []);
     } catch { /* noop */ }
   };
+
+  const loadHistorial = async () => {
+    setLoadingHistorial(true);
+    try {
+      const data = await getHistorialPaginado(histFiltroYear, histFiltroMonth, histPage);
+      setHistorialPaginado(data);
+    } catch {
+      setHistorialPaginado(null);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
   useEffect(() => { loadDia(); }, []);
+  useEffect(() => { loadHistorial(); }, [histFiltroYear, histFiltroMonth, histPage]);
 
   const selectProduct = async (p, preferLoteId = null) => {
     setProductoSel({ id: p.id, nombre: p.nombre, valor_unitario: Number(p.valor_unitario || 0) });
@@ -144,9 +163,13 @@ export default function RegistrarVentaPage() {
   };
 
   const doAnular = async (ventaId) => {
-    if (!confirm(`¿Anular la venta #${ventaId}?`)) return;
-    try { await anularVenta(ventaId); await loadDia(); }
-    catch (e) { alert(e?.response?.data?.detail || "No se pudo anular la venta."); }
+    if (!confirm(`¿Seguro que deseas anular esta venta #${ventaId}?`)) return;
+    try {
+      await anularVenta(ventaId);
+      await loadDia();
+      alert("Venta anulada exitosamente.");
+    }
+    catch (e) { alert(e?.payload?.detail || e?.message || "No se pudo anular la venta."); }
   };
 
   return (
@@ -314,29 +337,109 @@ export default function RegistrarVentaPage() {
         </button>
       </div>
 
-      {/* HISTORIAL MENSUAL */}
+      {/* DETALLE DE VENTAS HISTÓRICAS */}
       <div className="card" style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: 12 }}>Historial de Ventas por Mes</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0 }}>Detalle de Ventas Históricas</h2>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <select
+              style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+              value={histFiltroYear}
+              onChange={(e) => { setHistFiltroYear(e.target.value); setHistPage(1); }}
+            >
+              <option value="">Todos los años</option>
+              {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <select
+              style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+              value={histFiltroMonth}
+              onChange={(e) => { setHistFiltroMonth(e.target.value); setHistPage(1); }}
+            >
+              <option value="">Todos los meses</option>
+              <option value="1">Enero</option>
+              <option value="2">Febrero</option>
+              <option value="3">Marzo</option>
+              <option value="4">Abril</option>
+              <option value="5">Mayo</option>
+              <option value="6">Junio</option>
+              <option value="7">Julio</option>
+              <option value="8">Agosto</option>
+              <option value="9">Septiembre</option>
+              <option value="10">Octubre</option>
+              <option value="11">Noviembre</option>
+              <option value="12">Diciembre</option>
+            </select>
+          </div>
+        </div>
+
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th scope="col">Mes</th>
-                <th scope="col" className="text-right">Total Vendido</th>
+                <th scope="col">FECHA Y HORA</th>
+                <th scope="col">MEDICAMENTO</th>
+                <th scope="col">LOTE</th>
+                <th scope="col" className="text-right">CANTIDAD</th>
+                <th scope="col" className="text-right">TOTAL PAGADO</th>
+                <th scope="col" className="text-right">ESTADO</th>
               </tr>
             </thead>
             <tbody>
-              {historialMensual.length === 0 ? (
-                <tr><td className="muted" colSpan={2}>No hay historial este año</td></tr>
-              ) : historialMensual.map(m => (
-                <tr key={m.mes_num}>
-                  <td>{m.mes}</td>
-                  <td className="text-right"><b>${money(m.total)}</b></td>
-                </tr>
-              ))}
+              {loadingHistorial ? (
+                <tr><td colSpan={6} className="muted text-center" style={{ padding: '24px' }}>Cargando historial...</td></tr>
+              ) : !historialPaginado || !historialPaginado.results || historialPaginado.results.length === 0 ? (
+                <tr><td colSpan={6} className="muted text-center" style={{ padding: '24px' }}>No hay ventas en este periodo</td></tr>
+              ) : (
+                historialPaginado.results.map(v => {
+                  const it = (v.items && v.items[0]) || {};
+                  return (
+                    <tr key={v.id} style={{ opacity: v.anulada ? 0.6 : 1 }}>
+                      <td className="mono">{v.fecha ? new Date(v.fecha).toLocaleString('es-CO') : "-"}</td>
+                      <td className="font-medium">{it.producto_nombre || "-"}</td>
+                      <td>{it.lote_numero ? `#${it.lote_numero}` : (it.lote ? `#${it.lote}` : "FEFO")}</td>
+                      <td className="text-right">{it.cantidad ?? "-"}</td>
+                      <td className="text-right"><b>${money(v.total)}</b></td>
+                      <td className="text-right">
+                        {v.anulada ? (
+                          <span className="text-danger tiny" style={{ background: '#fef2f2', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>ANULADA</span>
+                        ) : (
+                          <span style={{ color: '#059669', background: '#ecfdf5', padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold' }}>COMPLETADA</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Paginación */}
+        {historialPaginado && historialPaginado.num_pages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '0 8px' }}>
+            <span className="muted" style={{ fontSize: '0.875rem' }}>
+              Página {historialPaginado.current_page} de {historialPaginado.num_pages} ({historialPaginado.count} resultados)
+            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className="btn"
+                onClick={() => setHistPage(p => Math.max(1, p - 1))}
+                disabled={historialPaginado.current_page === 1 || loadingHistorial}
+              >
+                Anterior
+              </button>
+              <button
+                className="btn btn--primary"
+                onClick={() => setHistPage(p => Math.min(historialPaginado.num_pages, p + 1))}
+                disabled={historialPaginado.current_page === historialPaginado.num_pages || loadingHistorial}
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import "../../../styles/productos.css";
 import ProductoForm from "../components/ProductoForm";
 import ProductoTable from "../components/ProductoTable";
+import { importarCSV } from "../importService";
 import { productoCreate, productosList } from "../service";
 
 export default function ProductosPage() {
@@ -67,7 +68,7 @@ export default function ProductosPage() {
           >
             {importing ? "Importando..." : "📁 Importar CSV"}
           </button>
-          <Link to="/panel" className="link-back">← Volver al Panel</Link>
+          <Link to="/panel" className="btn">⬅️ Volver al Panel</Link>
         </div>
       </div>
 

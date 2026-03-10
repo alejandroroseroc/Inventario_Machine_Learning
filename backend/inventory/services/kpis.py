@@ -5,6 +5,7 @@ from inventory.repositories import (
     productos_bajo_rop_count,
     lotes_por_vencer_count,
     movimientos_recientes,
+    ventas_reales_ultimos_7_dias,
 )
 
 
@@ -32,4 +33,5 @@ def compute_kpis(usuario=None):
         "porcentaje_criticos": round(porcentaje, 2),
         "por_vencer": int(por_vencer or 0),
         "transacciones_recientes": eventos,
+        "ventas_semana": ventas_reales_ultimos_7_dias(usuario),
     }

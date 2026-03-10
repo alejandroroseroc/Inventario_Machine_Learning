@@ -22,6 +22,7 @@ from .alertas import (
 from .ventas import crear_venta, anular_venta
 from .kpis import compute_kpis
 from .imports import ImportService
+from .gestion_vencimiento import gestionar_vencimiento, GestionVencimientoError
 
 __all__ = [
     # Productos
@@ -50,5 +51,8 @@ __all__ = [
     # KPIs
     "compute_kpis",
     "ImportService",
+    # Gestión vencimiento
+    "gestionar_vencimiento",
+    "GestionVencimientoError",
 ]
 

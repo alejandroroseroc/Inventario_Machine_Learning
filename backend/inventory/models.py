@@ -39,13 +39,19 @@ class Lote(models.Model):
         return f"Lote #{self.id} ({self.producto.codigo})"
 
 class Movimiento(models.Model):
-    TIPO = (("entrada","entrada"), ("salida","salida"), ("ajuste","ajuste"))
+    TIPO = (
+        ("entrada", "entrada"),
+        ("salida", "salida"),
+        ("ajuste", "ajuste"),
+        ("devolucion_proveedor", "devolucion_proveedor"),
+        ("baja_vencimiento", "baja_vencimiento"),
+    )
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
     lote = models.ForeignKey(Lote, on_delete=models.PROTECT)
     usuario = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
-    tipo = models.CharField(max_length=10, choices=TIPO)
+    tipo = models.CharField(max_length=25, choices=TIPO)
     cantidad = models.IntegerField()
-    fecha_mov = models.DateTimeField(auto_now_add=True)
+    fecha_mov = models.DateTimeField(default=timezone.now)
     venta = models.ForeignKey("Venta", null=True, blank=True, on_delete=models.SET_NULL, related_name="movimientos")
 
     def __str__(self):

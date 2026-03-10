@@ -19,12 +19,7 @@ from inventory.models import Movimiento
 from ml.model_engine import train_and_select
 
 # ── Whitelist de features permitidos ─────────────────────────────────────
-ALLOWED_FEATURES = {"lag1", "lag7", "ma7"} | {f"dow_{k}" for k in range(1, 7)}
-
-FEATURE_NAMES = (
-    ["lag1", "lag7", "ma7"] +
-    [f"dow_{k}" for k in range(1, 7)]
-)
+FEATURE_NAMES = ["lag1", "lag7", "ma7", "es_quincena", "es_finde", "tendencia"] + [f"dow_{k}" for k in range(1, 7)]
 
 
 @dataclass
@@ -57,6 +52,7 @@ def daily_series(producto_id: int, lookback_days: int = 180) -> list:
             fecha_mov__date__gte=ini,
             fecha_mov__date__lte=hoy,
         )
+        .exclude(venta__anulada=True)
         .annotate(d=TruncDate("fecha_mov"))
         .values("d")
         .annotate(total=Sum("cantidad"))
@@ -73,53 +69,71 @@ def daily_series(producto_id: int, lookback_days: int = 180) -> list:
 def build_matrix(rows: list):
     """
     Construye la matriz de features para el modelo.
-
-    Features (9 en total):
-        lag1, lag7, MA7,
-        dummies DOW (1..6) [0=Lunes es baseline]
+    Incluye features expertos (quincena, finde, tendencia).
     """
+    import pandas as pd
+    if not rows:
+        return np.array([]), np.array([]), [], FEATURE_NAMES
+        
+    all_y = [float(r["y"]) for r in rows]
+    all_dates = [r["date"] for r in rows]
+    
+    # Pre-calculos para performance y facilidad
+    fechas_pd = pd.to_datetime(all_dates)
+    dia_mes = fechas_pd.day
+    dias_semana = fechas_pd.weekday
+    dias_desde_inicio = (fechas_pd - fechas_pd[0]).days
+
     X, Y, dates = [], [], []
     for i in range(len(rows)):
         if i < 7:
             continue
 
-        d = rows[i]["date"]
-        y = rows[i]["y"]
-        y_lag1 = rows[i - 1]["y"]
-        y_lag7 = rows[i - 7]["y"]
-        ma7 = sum(r["y"] for r in rows[i - 7:i]) / 7.0
-        dow = d.weekday()                                        # 0..6
-        dummies = [1 if dow == k else 0 for k in range(1, 7)]   # 6 dummies
+        y = all_y[i]
+        y_lag1 = all_y[i - 1]
+        y_lag7 = all_y[i - 7]
+        ma7 = sum(all_y[j] for j in range(i - 7, i)) / 7.0
+        
+        # Expert features
+        es_quin = 1.0 if dia_mes[i] in [14, 15, 16, 29, 30, 31] else 0.0
+        es_finde = 1.0 if dias_semana[i] in [4, 5] else 0.0
+        tend = float(dias_desde_inicio[i])
+        
+        dow = dias_semana[i]                                        # 0..6
+        dummies = [1.0 if dow == k else 0.0 for k in range(1, 7)]   # 6 dummies
 
-        x = [y_lag1, y_lag7, ma7] + dummies
+        x = [y_lag1, y_lag7, ma7, es_quin, es_finde, tend] + dummies
         X.append(x)
         Y.append(y)
-        dates.append(d)
+        dates.append(all_dates[i])
 
     return np.array(X, dtype=float), np.array(Y, dtype=float), dates, FEATURE_NAMES
 
 
-def _predict_iterative(model, hist_rows: list, feature_names: list, h: int):
+def _predict_iterative(model, hist_rows: list, feature_names: list, h: int, start_idx: int = 0):
     """
-    Predice día a día para horizonte h, recalculando lag/MA7 con predicciones anteriores.
-    Devuelve (serie, contribuciones_acumuladas_por_feature).
+    Predice día a día para horizonte h.
     """
     serie = []
     contrib_sum = np.zeros(len(feature_names), dtype=float)
 
-    for _ in range(h):
+    for step in range(h):
         i = len(hist_rows)
         d = hist_rows[-1]["date"] + timedelta(days=1)
 
-        if i < 7:
-            x = [hist_rows[-1]["y"], 0, hist_rows[-1]["y"]] + [0] * 6
-        else:
-            y_lag1 = hist_rows[-1]["y"]
-            y_lag7 = hist_rows[-7]["y"]
-            ma7 = sum(r["y"] for r in hist_rows[-7:]) / 7.0
-            dow = d.weekday()
-            dummies = [1 if dow == k else 0 for k in range(1, 7)]
-            x = [y_lag1, y_lag7, ma7] + dummies
+        y_lag1 = float(hist_rows[-1]["y"])
+        y_lag7 = float(hist_rows[-7]["y"]) if i >= 7 else y_lag1
+        ma7 = sum(float(r["y"]) for r in hist_rows[-7:]) / 7.0 if i >= 7 else y_lag1
+        
+        # Expert features
+        es_quin = 1.0 if d.day in [14, 15, 16, 29, 30, 31] else 0.0
+        es_finde = 1.0 if d.weekday() in [4, 5] else 0.0
+        # Tendencia relativa
+        tend = float(start_idx + i) 
+        
+        dow = d.weekday()
+        dummies = [1.0 if dow == k else 0.0 for k in range(1, 7)]
+        x = [y_lag1, y_lag7, ma7, es_quin, es_finde, tend] + dummies
 
         x_arr = np.array([x], dtype=float)
         yhat = float(model.predict(x_arr)[0])
@@ -175,9 +189,24 @@ def forecast_daily(
                 historico=historico,
                 top_factors=[{"factor": "insuficientes_datos", "impacto": 0}]
             )
+            
+        # Si la varianza de Y es 0 (ej. todos los días se venden exactamente 3 unidades, o 0 unidades), R2 será matemáticamente 0.
+        if np.var(Y) == 0:
+            historico = [{"date": r["date"].isoformat(), "y_real": r["y"]} for r in rows[-30:]]
+            return ForecastResult(
+                yhat_total=float(np.mean(Y) * h),
+                rmse=0,
+                r2=1.0, # Técnicamente es constante, le damos 1.0 para no asustar con "baja confianza" cuando es 100% predecible o lo marcamos especial
+                mae=0,
+                modelo="constante",
+                safety=0,
+                serie=[{"date": (dates[-1] + timedelta(days=i+1)).isoformat(), "yhat": float(np.mean(Y))} for i in range(h)],
+                historico=historico,
+                top_factors=[{"factor": "ventas_constantes", "impacto": 1.0}]
+            )
 
         # ── Entrenar y seleccionar mejor modelo ─────────────────────────
-        val_k = min(14, len(Y))
+        val_k = min(21, len(Y) // 4) # Usar 21 días o el 25% para validar más robustamente
         X_train, Y_train = X[:-val_k], Y[:-val_k]
         X_val, Y_val = X[-val_k:], Y[-val_k:]
 

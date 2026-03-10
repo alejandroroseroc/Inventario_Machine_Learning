@@ -1,4 +1,3 @@
-// src/features/lotes/repository.js
 import { http } from "../../api/http";
 const BASE = "/inventory/lotes";
 
@@ -11,9 +10,16 @@ export async function createLote(payload) {
   return http.post(BASE, { body: payload, auth: true });
 }
 
-export async function listLotesPorVencer({ productoId, dias = 60 }) {
+export async function listLotesPorVencer({ productoId, dias = 60, estado = "activa" }) {
   const q = new URLSearchParams();
   if (productoId) q.set("producto", productoId);
   if (dias) q.set("dias", String(dias));
+  if (estado) q.set("estado", estado);
   return http.get(`/inventory/lotes/por-vencer?${q.toString()}`, { auth: true });
+}
+
+export async function gestionarVencimiento(loteId) {
+  return http.post(`/inventory/lotes/${loteId}/gestionar_vencimiento`, {
+    auth: true,
+  });
 }

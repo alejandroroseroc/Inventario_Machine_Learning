@@ -4,15 +4,16 @@ const fromApi = (a) => ({
   id: a.id,
   tipo: a.tipo,
   estado: a.estado,
-  severidad: a.criticidad,            // viene como 'criticidad' del backend
+  severidad: a.criticidad,
   mensaje: a.mensaje,
   productoId: a.producto,
   productoCodigo: a.producto_codigo,
   productoNombre: a.producto_nombre,
+  productoCodigoBarras: a.producto_codigo_barras,
   loteId: a.lote,
   creadoEn: a.created_at,
   resueltoEn: a.resolved_at,
-  explicacion: a.explicacion || null, // chips de razones (top factores, rmse, safety)
+  explicacion: a.explicacion || null,
 });
 
 export const AlertsService = {

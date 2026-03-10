@@ -1,12 +1,25 @@
-// src/components/Navbar.jsx
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { listLotesPorVencer } from "../features/lotes/repository";
 import "./Navbar.css";
 
 export default function Navbar() {
   const { isAuth, logout } = useAuth();
   const nav = useNavigate();
   const { pathname } = useLocation();
+  const [hasAlerts, setHasAlerts] = useState(false);
+
+  useEffect(() => {
+    if (!isAuth) return;
+    listLotesPorVencer({ dias: 60 })
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setHasAlerts(true);
+        }
+      })
+      .catch(() => { });
+  }, [isAuth]);
 
   if (!isAuth) return null;
 
@@ -25,8 +38,13 @@ export default function Navbar() {
           <Link className={active("/panel")} to="/panel">Panel</Link>
           <Link className={active("/productos")} to="/productos">Inventario</Link>
           <Link className={active("/ventas")} to="/ventas">Ventas</Link>
-          {/*  Enlace a la vista de alertas/sugerencias */}
-          <Link className={active("/alertas")} to="/alertas/sugerencias">Alertas</Link>
+          {/* Enlace a la vista de alertas/sugerencias con efecto glow si hay alertas */}
+          <Link
+            className={`${active("/alertas")} ${hasAlerts ? "nav__link--glow" : ""}`}
+            to="/alertas/sugerencias"
+          >
+            Alertas
+          </Link>
         </nav>
 
         <div className="nav__spacer" />

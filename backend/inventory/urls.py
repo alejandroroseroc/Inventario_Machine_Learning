@@ -19,7 +19,9 @@ from .api.views import (
     VentaDetailView,
     VentaCierreDiaView,
     VentaMonthlyHistoryView,
+    VentaHistorialView,
     CSVImportView,
+    GestionarVencimientoView,
 )
 
 
@@ -37,6 +39,7 @@ urlpatterns = [
     # Lotes
     path("inventory/lotes", LoteListCreateView.as_view(), name="lotes-list-create"),
     path("inventory/lotes/por-vencer", LotesPorVencerView.as_view(), name="lotes-por-vencer"),
+    path("inventory/lotes/<int:pk>/gestionar_vencimiento", GestionarVencimientoView.as_view(), name="lote-gestionar-vencimiento"),
 
     # Movimientos
     path("inventory/movimientos", MovimientoListCreateView.as_view(), name="movimientos-list-create"),
@@ -52,8 +55,8 @@ urlpatterns = [
     path("inventory/ventas/<int:pk>", VentaDetailView.as_view(), name="ventas-detail"),
     path("inventory/ventas/cierre", VentaCierreDiaView.as_view(), name="ventas-cierre"),
     path("inventory/ventas/historial-mensual", VentaMonthlyHistoryView.as_view(), name="ventas-historial-mensual"),
+    path("inventory/ventas/historial", VentaHistorialView.as_view(), name="ventas-historial-paginado"),
 
     # Imports
     path("inventory/import-csv", CSVImportView.as_view(), name="import-csv"),
 ]
-

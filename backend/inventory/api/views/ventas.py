@@ -3,6 +3,7 @@ from django.db.models import Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -130,3 +131,38 @@ class VentaMonthlyHistoryView(APIView):
             })
             
         return Response(data, status=200)
+
+
+class VentaHistorialView(APIView):
+    """
+    GET /api/inventory/ventas/historial?year=2024&month=2&page=1
+    Retorna el detalle paginado de ventas históricas, ordenadas por fecha reciente.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        year = request.query_params.get("year")
+        month = request.query_params.get("month")
+        page_num = request.query_params.get("page", 1)
+        page_size = 15
+
+        qs = Venta.objects.filter(usuario=request.user).order_by("-id")
+        
+        if year:
+            qs = qs.filter(fecha__year=year)
+        if month:
+            qs = qs.filter(fecha__month=month)
+
+        paginator = Paginator(qs, page_size)
+        try:
+            page = paginator.get_page(page_num)
+        except Exception:
+            page = paginator.get_page(1)
+
+        serializer = VentaSerializer(page.object_list, many=True)
+        return Response({
+            "count": paginator.count,
+            "num_pages": paginator.num_pages,
+            "current_page": page.number,
+            "results": serializer.data
+        })

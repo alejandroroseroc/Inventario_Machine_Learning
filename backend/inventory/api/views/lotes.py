@@ -54,15 +54,20 @@ class LotesPorVencerView(APIView):
         except ValueError:
             dias = 60
         producto_id = request.query_params.get("producto")
+        estado = request.query_params.get("estado", "activa") # actia | resuelta
 
         hoy = timezone.now().date()
         limite = hoy + timedelta(days=dias)
 
         qs = Lote.objects.select_related("producto").filter(
             producto__usuario=request.user,
-            fecha_caducidad__lte=limite,
-            stock_lote__gt=0
+            fecha_caducidad__lte=limite
         )
+        
+        if estado == "activa":
+            qs = qs.filter(stock_lote__gt=0)
+        elif estado == "resuelta":
+            qs = qs.filter(stock_lote=0)
         if producto_id:
             qs = qs.filter(producto_id=producto_id)
 

@@ -8,7 +8,11 @@ from django.utils import timezone
 
 from inventory.models import Alerta, Producto
 from inventory.api.serializers import AlertaSerializer
-from inventory.services import recalcular_alertas_stock_todas, asegurar_alerta_sugerencia_stock
+from inventory.services import (
+    recalcular_alertas_stock_todas, 
+    asegurar_alerta_sugerencia_stock,
+    recalcular_productos
+)
 from ml.linear_daily import forecast_daily
 
 
@@ -45,6 +49,9 @@ class AlertasStockRecalcularPredictView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        # Asegurar que las categorías ABC y ROP base estén al día antes de predecir
+        recalcular_productos()
+        
         try:
             h = int(request.query_params.get("h", 14))
         except ValueError:
@@ -71,12 +78,17 @@ class AlertasStockRecalcularPredictView(APIView):
                 continue
 
             disponible = int(p.get("stock_total") or 0)
+            
+            # Calculamos la sugerencia, pero permitimos que sea 0 para mostrar el análisis ML
             sugerido = max(0, int(round(res.yhat_total)) + int(res.safety) - disponible)
-            if sugerido <= 0:
-                continue
-
-            top1 = (res.top or [{"factor": "tendencia"}])[0]["factor"]
-            msg = f"Sugerido {sugerido} uds para {h} días"
+            
+            # Mostramos el sugerido si es > 0, o 0 si el stock es suficiente
+            if sugerido > 0:
+                msg = f"Sugerido comprar {sugerido} uds para {h} días"
+            else:
+                msg = f"Stock óptimo. Predisposición de {int(round(res.yhat_total))} uds en {h} días"
+            
+            top1 = (res.top_factors or [{"factor": "tendencia"}])[0]["factor"]
             explicacion = {
                 "modelo": res.modelo,
                 "h": h,

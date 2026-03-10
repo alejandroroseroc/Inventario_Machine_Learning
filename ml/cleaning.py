@@ -16,9 +16,10 @@ class CSVCleaner:
         'codigo': ['cod', 'codigo', 'id_producto', 'sku', 'referencia', 'ref'],
         'nombre': ['nombre', 'producto', 'descripcion', 'item', 'articulo'],
         'cantidad': ['cantidad', 'cant', 'qty', 'unidades', 'stock'],
-        'precio': ['precio', 'valor', 'unitario', 'costo', 'price'],
         'fecha': ['fecha', 'fec', 'date', 'momento', 'day'],
         'lote': ['lote', 'batch', 'nro_lote', 'serie'],
+        'tipo_movimiento': ['tipo_movimiento', 'tipo movimento', 'tipo', 'movement'],
+        'precio_costo': ['precio_costo', 'costo_compra', 'precio costo', 'costo', 'precio_vta', 'precio'],
     }
 
     def __init__(self, df: pd.DataFrame):
@@ -69,7 +70,7 @@ class CSVCleaner:
         for std_name, orig_name in self.column_mapping.items():
             col_data = self.df[orig_name]
             
-            if std_name in ['cantidad', 'precio']:
+            if std_name in ['cantidad', 'precio', 'precio_costo']:
                 clean_df[std_name] = self._clean_numeric(col_data)
             elif std_name == 'fecha':
                 clean_df[std_name] = self._clean_date(col_data)

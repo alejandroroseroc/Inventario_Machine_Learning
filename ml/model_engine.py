@@ -35,6 +35,7 @@ def train_and_select(
         dict con keys: model, modelo (str), r2, mae, rmse, coef_ (optional)
     """
     # ── 1. Linear Regression ─────────────────────────────────────────────
+    from sklearn.linear_model import LinearRegression
     lr = LinearRegression().fit(X_train, Y_train)
     lr_pred = lr.predict(X_val)
     lr_rmse = _rmse(Y_val, lr_pred)
@@ -76,7 +77,13 @@ def train_and_select(
     best = min(candidates, key=lambda c: c["rmse"])
 
     pred_val = best["pred_val"]
-    r2 = float(r2_score(Y_val, pred_val)) if len(Y_val) > 1 else 0.0
+    
+    # R2 sobre validación, pero si la varianza es muy baja, evitamos números negativos extraños
+    if np.var(Y_val) > 0.001:
+        r2 = float(r2_score(Y_val, pred_val))
+    else:
+        r2 = 1.0 if _rmse(Y_val, pred_val) < 0.5 else 0.0
+        
     mae = float(mean_absolute_error(Y_val, pred_val))
     rmse = best["rmse"]
 

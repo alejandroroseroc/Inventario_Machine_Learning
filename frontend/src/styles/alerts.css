@@ -106,4 +106,98 @@
   .alerts-scope .controls { flex-wrap: wrap; }
   .alerts-scope .tabs { flex-direction: column; }
   .alerts-scope .chip { font-size: 10px; padding: 4px 8px; }
+  .modal-box { width: 95vw !important; max-width: 95vw !important; margin: 16px !important; }
 }
+
+/* ───── Modal ───── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .15s ease;
+}
+@keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+@keyframes slideUp { from { transform:translateY(24px); opacity:0 } to { transform:translateY(0); opacity:1 } }
+
+.modal-box {
+  background: #fff; border-radius: 16px; width: 520px; max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  animation: slideUp .2s ease;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 16px; border-bottom: 1px solid #e5e7eb;
+}
+.modal-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: #111827; }
+.modal-close {
+  background: transparent; border: none; font-size: 1.3rem;
+  cursor: pointer; color: #6b7280; padding: 4px 8px; border-radius: 8px;
+  transition: background .15s;
+}
+.modal-close:hover { background: #f3f4f6; }
+
+.modal-body { padding: 20px 24px; }
+
+.modal-info-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-bottom: 20px;
+}
+.modal-info-item { display: flex; flex-direction: column; gap: 2px; }
+.modal-info-label { font-size: 0.75rem; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.modal-info-value { font-size: 0.95rem; color: #111827; font-weight: 500; }
+
+/* Badge: apto devolución */
+.badge-devolucion {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px;
+  padding: 14px 16px;
+}
+.badge-devolucion strong { color: #065f46; display: block; margin-bottom: 4px; }
+.badge-devolucion p { margin: 0; font-size: 0.85rem; color: #047857; line-height: 1.4; }
+
+/* Badge: pérdida total */
+.badge-baja {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px;
+  padding: 14px 16px;
+}
+.badge-baja strong { color: #991b1b; display: block; margin-bottom: 4px; }
+.badge-baja p { margin: 0; font-size: 0.85rem; color: #b91c1c; line-height: 1.4; }
+
+.badge-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 2px; }
+
+.modal-error {
+  background: #fef2f2; color: #b91c1c; padding: 10px 12px;
+  border-radius: 8px; margin-top: 12px; font-size: 0.85rem;
+}
+
+.modal-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 24px; border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+.modal-btn-cancel {
+  background: #fff !important; color: #374151 !important;
+  border: 1px solid #d1d5db !important; padding: 8px 16px !important;
+  border-radius: 10px !important; font-weight: 600 !important; cursor: pointer;
+}
+.modal-btn-cancel:hover { background: #f3f4f6 !important; }
+.modal-btn-devolucion {
+  background: #059669 !important; color: #fff !important;
+  border: 1px solid #059669 !important; padding: 8px 16px !important;
+  border-radius: 10px !important; font-weight: 600 !important; cursor: pointer;
+}
+.modal-btn-devolucion:hover { background: #047857 !important; }
+.modal-btn-baja {
+  background: #dc2626 !important; color: #fff !important;
+  border: 1px solid #dc2626 !important; padding: 8px 16px !important;
+  border-radius: 10px !important; font-weight: 600 !important; cursor: pointer;
+}
+.modal-btn-baja:hover { background: #b91c1c !important; }
+
+/* ───── Conditional colors for dias_restantes ───── */
+.alerts-scope .text-dias-red    { color: #b91c1c; font-weight: 700; }
+.alerts-scope .text-dias-orange { color: #b45309; font-weight: 600; }
+.alerts-scope .text-dias-normal { color: #111827; }

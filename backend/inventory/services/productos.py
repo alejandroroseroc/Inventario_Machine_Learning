@@ -10,20 +10,30 @@ from inventory.repositories import demanda_media_diaria, ingresos_por_producto
 ABC_CUTOFF_A = 0.80
 ABC_CUTOFF_B = 0.95
 ABC_WINDOW_DAYS = 30
-ROP_LEAD_TIME = 3
-ROP_BUFFER = 0.20
+ROP_LEAD_TIME = 5
+ROP_BUFFER = 0.25
 
 
 def _calcular_rop(producto):
-    """Calcula el punto de reorden basado en demanda media diaria."""
+    """Calcula el punto de reorden basado en demanda media diaria.
+    Usa una ventana flexible: si en 30 días no hay datos, busca en 180 días.
+    """
     dmd = demanda_media_diaria(producto, dias=ABC_WINDOW_DAYS)
+    if dmd <= 0:
+        # Fallback para datos de tesis cargados históricamente
+        dmd = demanda_media_diaria(producto, dias=180)
+        
     rop = math.ceil(dmd * ROP_LEAD_TIME * (1.0 + ROP_BUFFER))
     return max(0, int(rop))
 
 
 def _clasificacion_abc():
-    """Calcula la clasificación ABC basada en ingresos."""
+    """Calcula la clasificación ABC basada en ingresos con ventana flexible."""
     ingresos = ingresos_por_producto(dias=ABC_WINDOW_DAYS)
+    if not ingresos or sum(float(v or 0) for v in ingresos.values()) <= 0:
+        # Fallback a 180 días si los últimos 30 están vacíos
+        ingresos = ingresos_por_producto(dias=180)
+        
     if not ingresos:
         return {}
     total = sum(float(v or 0) for v in ingresos.values()) or 0.0

@@ -1,14 +1,15 @@
 /* ===== Barra superior ===== */
-.nav{
+.nav {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: #1e3a8a; /* azul */
+  background: #1e3a8a;
+  /* azul */
   color: #fff;
-  box-shadow: 0 1px 8px rgba(0,0,0,.15);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, .15);
 }
 
-.nav__inner{
+.nav__inner {
   max-width: 1100px;
   margin: 0 auto;
   padding: 12px 16px;
@@ -17,19 +18,19 @@
   gap: 16px;
 }
 
-.nav__brand{
+.nav__brand {
   font-weight: 700;
   letter-spacing: .3px;
 }
 
 /* ===== Menú ===== */
-.nav__menu{
+.nav__menu {
   display: flex;
   gap: 28px;
   align-items: center;
 }
 
-.nav__link{
+.nav__link {
   color: #e5e7eb;
   text-decoration: none;
   font-weight: 700;
@@ -37,44 +38,83 @@
   position: relative;
   transition: color .15s ease;
 }
-.nav__link:hover{ color:#fff; }
+
+.nav__link:hover {
+  color: #fff;
+}
 
 /* Foco visible en enlaces (accesibilidad) */
-.nav__link:focus-visible{
-  outline: 3px solid #fde68a;   /* amarillo suave */
+.nav__link:focus-visible {
+  outline: 3px solid #fde68a;
+  /* amarillo suave */
   outline-offset: 3px;
   border-radius: 8px;
 }
 
-.nav__link--active{
+.nav__link--active {
   color: #fff;
 }
-.nav__link--active::after{
-  content:"";
-  position:absolute; left:0; right:0; bottom:-8px;
-  height:4px; border-radius:999px;
-  background: linear-gradient(90deg,#10b981,#22d3ee); /* subrayado degradado */
+
+.nav__link--active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #10b981, #22d3ee);
+  /* subrayado degradado */
 }
 
-.nav__spacer{ flex: 1; }
+.nav__spacer {
+  flex: 1;
+}
 
 /* ===== Botón Cerrar sesión (contraste AA + foco) ===== */
-.nav__logout{
-  background:#b91c1c;           /* red-700: pasa AA con texto blanco */
-  color:#fff;
-  border:1px solid #7f1d1d;     /* leve borde para definición/foco */
+.nav__logout {
+  background: #b91c1c;
+  /* red-700: pasa AA con texto blanco */
+  color: #fff;
+  border: 1px solid #7f1d1d;
+  /* leve borde para definición/foco */
   padding: 8px 12px;
   border-radius: 10px;
   cursor: pointer;
-  font-weight:700;
+  font-weight: 700;
   transition: background .15s ease, box-shadow .15s ease;
 }
-.nav__logout:hover{ background:#991b1b; }
-.nav__logout:focus-visible{
-  outline:3px solid #fde68a;    /* anillo de enfoque accesible */
-  outline-offset:2px;
+
+.nav__logout:hover {
+  background: #991b1b;
 }
-.nav__logout:disabled{
-  opacity:.6;
-  cursor:default;
+
+.nav__logout:focus-visible {
+  outline: 3px solid #fde68a;
+  /* anillo de enfoque accesible */
+  outline-offset: 2px;
+}
+
+.nav__logout:disabled {
+  opacity: .6;
+  cursor: default;
+}
+
+/* ===== Glow Effect para Alertas ===== */
+.nav__link--glow {
+  animation: alertGlow 2s infinite alternate;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+@keyframes alertGlow {
+  0% {
+    box-shadow: 0 0 4px rgba(249, 115, 22, 0.4), inset 0 0 2px rgba(249, 115, 22, 0.2);
+    background-color: rgba(249, 115, 22, 0.05);
+  }
+
+  100% {
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.9), inset 0 0 6px rgba(249, 115, 22, 0.4);
+    background-color: rgba(249, 115, 22, 0.2);
+  }
 }

@@ -1,11 +1,11 @@
-// src/features/alerts/AlertsAndSuggestions.jsx
 import { useEffect, useMemo, useState } from "react";
 import { AlertsService } from "../../api/alerts.service";
 import { listLotesPorVencer } from "../lotes/repository";
+import RevisarLoteModal from "./RevisarLoteModal";
 
 const factorLabel = (f) => {
   if (f === "ma7") return "Tendencia (MA7)";
-  if (f === "lag1") return "Últ. día";
+  if (f === "lag1") return "Ult. dia";
   if (f === "lag7") return "Hace 1 semana";
   if (typeof f === "string" && f.startsWith("dow_")) {
     const k = parseInt(f.split("_")[1], 10);
@@ -61,13 +61,14 @@ export default function AlertsAndSuggestions() {
 
   const [expiring, setExpiring] = useState([]);
   const [mlAlerts, setMlAlerts] = useState([]);
+  const [loteRevisar, setLoteRevisar] = useState(null);
 
   const cargar = async () => {
     setLoading(true);
     setErr("");
     try {
       // Cargar lotes por vencer
-      const lotesRaw = await listLotesPorVencer({ dias: diasVenc });
+      const lotesRaw = await listLotesPorVencer({ dias: diasVenc, estado });
       console.log("Lotes crudos:", lotesRaw); // DEBUG
 
       const lotes = asArray(lotesRaw).map((x) => ({
@@ -122,18 +123,36 @@ export default function AlertsAndSuggestions() {
     () =>
       (expiring || []).map((r, i) => {
         const dias = r.diasRestantes;
-        const estadoDia = dias === null ? "-" : dias < 0 ? "Caducada" : dias;
+        const caducado = dias != null && dias < 0;
+        const estadoDia = dias === null ? "-" : caducado ? "Caducada" : dias;
+
+        // Formato condicional: rojo ≤30, naranja 31-45, normal >45
+        let diasClass = "text-dias-normal";
+        if (dias === null) diasClass = "";
+        else if (dias <= 30) diasClass = "text-dias-red";
+        else if (dias <= 45) diasClass = "text-dias-orange";
+
         return (
           <tr key={r.id || i}>
             <td>{r.productoNombre}</td>
             <td>{r.numeroLote}</td>
             <td>{r.cantidad ? `${r.cantidad} unidades` : "-"}</td>
             <td className="mono">{r.fechaCaducidad || "-"}</td>
-            <td className={dias < 0 ? "text-red" : "text-green"}>
-              {dias < 0 ? "Caducada" : estadoDia}
+            <td className={diasClass}>
+              {caducado ? "Caducada" : estadoDia}
             </td>
             <td className="text-right">
-              <button type="button" className="link">Revisar</button>
+              {r.cantidad > 0 ? (
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => setLoteRevisar(r)}
+                >
+                  Revisar
+                </button>
+              ) : (
+                <span className="text-dias-normal">Gestionado</span>
+              )}
             </td>
           </tr>
         );
@@ -162,8 +181,8 @@ export default function AlertsAndSuggestions() {
         const modelLabel = modelo === 'xgboost' ? 'XGBoost' : 'Reg. Lineal';
 
         // Identificador: priorizar código de barras
-        const barcode = a.producto_codigo_barras;
-        const idDisplay = barcode || a.producto_codigo || 'Sin ID';
+        const barcode = a.productoCodigoBarras;
+        const idDisplay = barcode || a.productoCodigo || 'Sin ID';
 
         return (
           <tr key={a.id}>
@@ -180,9 +199,9 @@ export default function AlertsAndSuggestions() {
                   }}>
                     {barcode ? `⊟ ${barcode}` : idDisplay}
                   </span>
-                  {barcode && a.producto_codigo && (
+                  {barcode && a.productoCodigo && (
                     <span style={{ color: '#999', fontSize: '0.75rem' }}>
-                      Cód: {a.producto_codigo}
+                      Cód: {a.productoCodigo}
                     </span>
                   )}
                 </div>
@@ -444,6 +463,18 @@ export default function AlertsAndSuggestions() {
           </div>
         )}
       </div>
+
+      {/* Modal de revisión de lote */}
+      {loteRevisar && (
+        <RevisarLoteModal
+          lote={loteRevisar}
+          onClose={() => setLoteRevisar(null)}
+          onDone={() => {
+            setLoteRevisar(null);
+            cargar();
+          }}
+        />
+      )}
     </section>
   );
 }

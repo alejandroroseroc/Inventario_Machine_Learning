@@ -1,10 +1,9 @@
 from datetime import date, timedelta
-from multiprocessing import Value
 from django.utils import timezone
-from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Value
 from django.db.models.functions import Coalesce
 
-from .models import Producto, Lote, Movimiento, Alerta
+from .models import Producto, Lote, Movimiento, Alerta, Venta
 
 def productos_con_stock_total(usuario=None):
     qs = Producto.objects.all()
@@ -116,3 +115,36 @@ def crear_alerta_stock(producto_id: int, mensaje: str, criticidad: str = "critic
 def resolver_alertas_stock(producto_id: int):
     return Alerta.objects.filter(producto_id=producto_id, tipo="stock", estado="activa") \
         .update(estado="resuelta")
+
+def ventas_reales_ultimos_7_dias(usuario=None):
+    """
+    Retorna una lista de 7 diccionarios {name, valor} con las ventas reales (no anuladas)
+    de los últimos 7 días para el usuario.
+    """
+    hoy = timezone.localdate()
+    desde = hoy - timedelta(days=6)
+    
+    qs = Venta.objects.filter(anulada=False, fecha__gte=desde)
+    if usuario:
+        qs = qs.filter(usuario=usuario)
+        
+    ventas_por_dia = (
+        qs.values("fecha")
+        .annotate(total=Sum("total"))
+        .order_by("fecha")
+    )
+    
+    dict_ventas = {v["fecha"]: float(v["total"]) for v in ventas_por_dia}
+    
+    # Días de la semana en español/abreviados para la gráfica
+    nombres_dias = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+    
+    res = []
+    for i in range(7):
+        current_date = desde + timedelta(days=i)
+        dia_semana = nombres_dias[current_date.weekday()]
+        res.append({
+            "name": dia_semana,
+            "valor": dict_ventas.get(current_date, 0.0)
+        })
+    return res

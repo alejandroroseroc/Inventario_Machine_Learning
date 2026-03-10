@@ -14,9 +14,10 @@ from .alertas import (
     AlertasStockRecalcularPredictView,
     AlertaResolverView,
 )
-from .ventas import VentaListCreateView, VentaDetailView, VentaCierreDiaView, VentaMonthlyHistoryView
+from .ventas import VentaListCreateView, VentaDetailView, VentaCierreDiaView, VentaMonthlyHistoryView, VentaHistorialView
 from .kpis import KPIView
 from .imports import CSVImportView
+from .gestion_vencimiento import GestionarVencimientoView
 
 __all__ = [
     # Productos
@@ -41,9 +42,12 @@ __all__ = [
     "VentaDetailView",
     "VentaCierreDiaView",
     "VentaMonthlyHistoryView",
+    "VentaHistorialView",
     # KPIs
     "KPIView",
     # Imports
     "CSVImportView",
+    # Gestión vencimiento
+    "GestionarVencimientoView",
 ]
 

@@ -15,8 +15,12 @@ export default function Login() {
     setError("");
     setBusy(true);
     try {
-      await login({ email, password });
-      nav("/panel", { replace: true });
+      const data = await login({ email, password });
+      if (data?.user?.is_admin) {
+        nav("/admin", { replace: true });
+      } else {
+        nav("/panel", { replace: true });
+      }
     } catch (err) {
       setError(
         err?.payload?.detail || err?.message || "No se pudo iniciar sesión"

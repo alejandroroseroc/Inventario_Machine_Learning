@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
+import { Bot } from "lucide-react";
 
 export default function MlSummaryCard({ countPorVencer = 0 }) {
     return (
         <div className="ml-summary-card">
             <div className="ml-summary-content">
                 <div className="ml-icon-wrapper">
-                    <span className="ml-icon">🤖</span>
+                    <Bot size={24} color="#6366f1" />
                 </div>
                 <div className="ml-text">
                     <h3 className="ml-title">Motor de Sugerencias ML</h3>

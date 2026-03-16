@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import "../../../styles/productos.css";
 import { lotesService } from "../../lotes/service";
 import { movimientosService } from "../../movimientos/service";
@@ -179,7 +180,14 @@ export default function ProductoDetailPage() {
       <div className="page__head">
         <h2 className="page__title">Producto #{id}</h2>
         <div className="actions">
-          <Link to="/productos" className="btn btn--ghost">← Volver</Link>
+          <Link
+            to="/productos"
+            className="btn btn--ghost"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#475569' }}
+          >
+            <ArrowLeft size={18} color="#64748b" strokeWidth={2.5} />
+            Volver
+          </Link>
           <button onClick={save} disabled={saving} className="btn btn--primary">{saving ? "Guardando..." : "Guardar cambios"}</button>
           <button onClick={remove} disabled={removing} className="btn btn--danger">{removing ? "Eliminando..." : "Eliminar"}</button>
         </div>

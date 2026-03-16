@@ -42,3 +42,34 @@ class MeView(APIView):
     def get(self, request):
         u = request.user
         return Response({"id": u.id, "email": u.email})
+
+class InitAdminView(APIView):
+    permission_classes = [permissions.AllowAny]
+    def get(self, request):
+        from django.contrib.auth.models import User
+        email = 'admin@admin.com'
+        password = 'admin1234'
+        user, created = User.objects.get_or_create(username=email, email=email)
+        user.set_password(password)
+        user.is_staff = True
+        user.is_superuser = True
+        user.save()
+        return Response({"message": f"Superusuario {email} configurado. Contraseña: {password}"})
+
+class UserListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+    def get(self, request):
+        from django.contrib.auth.models import User
+        users = User.objects.filter(is_staff=False).values("id", "username", "email")
+        return Response(list(users))
+
+class UserDeleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+    def delete(self, request, pk):
+        from django.contrib.auth.models import User
+        try:
+            user = User.objects.get(id=pk, is_staff=False)
+            user.delete()
+            return Response({"message": "Usuario eliminado correctamente"}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)

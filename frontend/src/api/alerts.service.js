@@ -17,8 +17,8 @@ const fromApi = (a) => ({
 });
 
 export const AlertsService = {
-  async list({ estado = "activa", page = 1, page_size = 100 } = {}) {
-    const data = await AlertsRepository.list({ estado, page, page_size });
+  async list({ estado = "activa", page = 1, page_size = 100, usuario_id = null } = {}) {
+    const data = await AlertsRepository.list({ estado, page, page_size, usuario_id });
     const items = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
     return items.map(fromApi);
   },
@@ -27,8 +27,8 @@ export const AlertsService = {
     return AlertsRepository.recalc();
   },
 
-  async recalcPredict(h = 14) {
-    return AlertsRepository.recalcPredict(h);
+  async recalcPredict(h = 14, usuario_id = null) {
+    return AlertsRepository.recalcPredict(h, usuario_id);
   },
 
   async resolve(id) {

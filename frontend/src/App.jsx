@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { Route, Routes } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import PrivateRoute from "./components/PrivateRoute";
+import AdminRoute from "./components/AdminRoute";
 
 import Login from "./features/auth/pages/login";
 import Register from "./features/auth/pages/register";
@@ -13,6 +14,7 @@ import RegistrarVentaPage from "./features/ventas/pages/RegistrarVentaPage.jsx";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 const AlertsPage = lazy(() => import("./features/alerts/AlertsPage.jsx"));
+const AdminMLPanel = lazy(() => import("./features/admin/pages/AdminMLPanel.jsx"));
 
 import "./styles/panel.css";
 
@@ -33,7 +35,7 @@ export default function App() {
           <Route path="/productos/:id" element={<PrivateRoute><ProductoDetailPage /></PrivateRoute>} />
           <Route path="/ventas" element={<PrivateRoute><RegistrarVentaPage /></PrivateRoute>} />
 
-          {/* 🔧 Ruta de alertas: usa tu AlertsPage.jsx */}
+          {/* 🔧 Ruta de alertas */}
           <Route
             path="/alertas/sugerencias"
             element={
@@ -42,6 +44,18 @@ export default function App() {
                   <AlertsPage />
                 </ErrorBoundary>
               </PrivateRoute>
+            }
+          />
+
+          {/* 🔐 Panel administrador (solo is_staff=True) */}
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <ErrorBoundary>
+                  <AdminMLPanel />
+                </ErrorBoundary>
+              </AdminRoute>
             }
           />
 

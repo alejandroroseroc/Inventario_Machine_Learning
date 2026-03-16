@@ -22,9 +22,19 @@ class AlertasStockListView(APIView):
 
     def get(self, request):
         estado = request.query_params.get("estado", "activa")
+        usuario_id = request.query_params.get("usuario_id")
+        
+        # Filtro base
+        user_to_filter = request.user
+        if request.user.is_staff and usuario_id:
+            from django.contrib.auth.models import User
+            try:
+                user_to_filter = User.objects.get(id=usuario_id)
+            except User.DoesNotExist:
+                return Response({"detail": "Usuario no encontrado."}, status=404)
+
         qs = Alerta.objects.select_related("producto").filter(
-            # tipo="stock",  <-- REMOVED to include "caducidad"
-            producto__usuario=request.user
+            producto__usuario=user_to_filter
         )
         if estado in ("activa", "resuelta"):
             qs = qs.filter(estado=estado)
@@ -57,13 +67,22 @@ class AlertasStockRecalcularPredictView(APIView):
         except ValueError:
             return Response({"detail": "Parámetro h inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
+        usuario_id = request.query_params.get("usuario_id")
+        user_to_process = request.user
+        if request.user.is_staff and usuario_id:
+            from django.contrib.auth.models import User
+            try:
+                user_to_process = User.objects.get(id=usuario_id)
+            except User.DoesNotExist:
+                return Response({"detail": "Usuario no encontrado."}, status=404)
+
         creadas = 0
         procesados = 0
         errores = []
 
         productos = (
             Producto.objects
-            .filter(usuario=request.user)
+            .filter(usuario=user_to_process)
             .annotate(stock_total=Sum("lotes__stock_lote"))
             .values("id", "categoria", "stock_total")
         )

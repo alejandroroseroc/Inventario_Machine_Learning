@@ -50,7 +50,7 @@ def daily_series(producto_id: int, lookback_days: int = 180) -> list:
             producto_id=producto_id,
             tipo="salida",
             fecha_mov__date__gte=ini,
-            fecha_mov__date__lte=hoy,
+            fecha_mov__date__lt=hoy,
         )
         .exclude(venta__anulada=True)
         .annotate(d=TruncDate("fecha_mov"))
@@ -60,7 +60,8 @@ def daily_series(producto_id: int, lookback_days: int = 180) -> list:
     by_date = {row["d"]: int(row["total"] or 0) for row in qs}
 
     rows, d = [], ini
-    while d <= hoy:
+    ayer = hoy - timedelta(days=1)
+    while d <= ayer:
         rows.append({"date": d, "y": by_date.get(d, 0)})
         d += timedelta(days=1)
     return rows

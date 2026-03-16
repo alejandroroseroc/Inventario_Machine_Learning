@@ -1,4 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { 
+  Calendar, 
+  Hash, 
+  RefreshCw, 
+  CheckCircle2, 
+  XCircle, 
+  AlertCircle 
+} from "lucide-react";
 import { AlertsService } from "../../api/alerts.service";
 import { listLotesPorVencer } from "../lotes/repository";
 import RevisarLoteModal from "./RevisarLoteModal";
@@ -166,21 +174,25 @@ export default function AlertsAndSuggestions() {
         const cant = parseSuggestedUnits(a.mensaje);
         const explicacion = a.explicacion || {};
         const r2 = explicacion.r2;
-        const mae = explicacion.mae;
-        const rmse = explicacion.rmse;
-        const modelo = explicacion.modelo;
 
-        // Semáforo R²
-        const pct = r2 != null ? Math.max(0, Math.min(100, Math.round(r2 * 100))) : null;
-        let barColor = '#e74c3c', confLabel = 'Baja confianza';
+        // Semáforo farmacéutico (solo colores y texto simple)
+        let dotColor = '#e74c3c', confLabel = 'Revisión recomendada', confText = 'La predicción tiene baja certeza. Se recomienda revisar con el equipo antes de ordenar.';
         if (r2 != null) {
-          if (r2 > 0.95) { barColor = '#e67e22'; confLabel = 'Posible overfitting'; }
-          else if (r2 >= 0.80) { barColor = '#27ae60'; confLabel = 'Alta confianza'; }
-          else if (r2 >= 0.60) { barColor = '#f39c12'; confLabel = 'Confianza moderada'; }
+          if (r2 > 0.95) {
+            dotColor = '#e67e22';
+            confLabel = 'Revisar cantidad';
+            confText = 'El sistema detectó un patrón inusual. Verifica el pedido antes de aprobarlo.';
+          } else if (r2 >= 0.80) {
+            dotColor = '#27ae60';
+            confLabel = 'Alta confianza';
+            confText = 'La sugerencia se basa en un patrón de ventas sólido. Puedes aprobarla con seguridad.';
+          } else if (r2 >= 0.60) {
+            dotColor = '#f39c12';
+            confLabel = 'Confianza moderada';
+            confText = 'La predicción es razonable, pero considera revisar el historial del producto.';
+          }
         }
-        const modelLabel = modelo === 'xgboost' ? 'XGBoost' : 'Reg. Lineal';
 
-        // Identificador: priorizar código de barras
         const barcode = a.productoCodigoBarras;
         const idDisplay = barcode || a.productoCodigo || 'Sin ID';
 
@@ -194,10 +206,12 @@ export default function AlertsAndSuggestions() {
                 </strong>
                 <div style={{ fontSize: '0.8rem', color: '#555', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
                     fontFamily: 'monospace', background: '#f0f0f0', padding: '1px 6px',
                     borderRadius: '3px', fontSize: '0.78rem', letterSpacing: '0.5px'
                   }}>
-                    {barcode ? `⊟ ${barcode}` : idDisplay}
+                    <Hash size={12} strokeWidth={2.5} color="#64748b" />
+                    {barcode || idDisplay}
                   </span>
                   {barcode && a.productoCodigo && (
                     <span style={{ color: '#999', fontSize: '0.75rem' }}>
@@ -220,77 +234,27 @@ export default function AlertsAndSuggestions() {
               )}
             </td>
 
-            {/* ── ANÁLISIS DE PREDICCIÓN ── */}
+            {/* ── SEMÁFORO DE CONFIANZA (vista farmacéutico) ── */}
             <td>
-              <div style={{
-                background: '#f8f9fb', border: '1px solid #e8eaed', borderRadius: '8px',
-                padding: '10px 12px', fontSize: '0.82rem'
-              }}>
-                {/* Fila 1: Badge modelo + R² bar */}
-                {pct != null && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
-                      <span style={{
-                        background: modelo === 'xgboost' ? '#8e44ad' : '#2c5aa0',
-                        color: '#fff', padding: '2px 8px', borderRadius: '4px',
-                        fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.3px'
-                      }}>
-                        {modelLabel}
-                      </span>
-                      <span style={{ fontWeight: 600, color: '#222' }}>
-                        R² {pct}%
-                      </span>
-                      <span style={{ color: barColor, fontWeight: 500, fontSize: '0.75rem' }}>
-                        {confLabel}
-                      </span>
-                    </div>
-                    <div style={{
-                      width: '100%', height: '6px', backgroundColor: '#e0e0e0',
-                      borderRadius: '3px', overflow: 'hidden'
-                    }}>
-                      <div style={{
-                        width: `${pct}%`, height: '100%', backgroundColor: barColor,
-                        borderRadius: '3px', transition: 'width 0.4s ease'
-                      }} />
-                    </div>
-                  </div>
-                )}
-
-                {/* Fila 2: Grid MAE / RMSE / Horizonte */}
-                <div style={{
-                  display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px',
-                  borderTop: pct != null ? '1px solid #e8eaed' : 'none',
-                  paddingTop: pct != null ? '8px' : '0',
-                  marginBottom: '6px'
-                }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#999', textTransform: 'uppercase', marginBottom: '1px' }}>MAE</div>
-                    <div style={{ fontWeight: 600, color: '#333' }}>
-                      {mae != null ? `±${mae.toFixed(1)}` : '—'}
-                      <span style={{ fontSize: '0.7rem', color: '#888' }}> uds</span>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center', borderLeft: '1px solid #e8eaed', borderRight: '1px solid #e8eaed' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#999', textTransform: 'uppercase', marginBottom: '1px' }}>RMSE</div>
-                    <div style={{ fontWeight: 600, color: '#333' }}>
-                      {rmse != null ? rmse.toFixed(1) : '—'}
-                      <span style={{ fontSize: '0.7rem', color: '#888' }}> uds</span>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.68rem', color: '#999', textTransform: 'uppercase', marginBottom: '1px' }}>Horizonte</div>
-                    <div style={{ fontWeight: 600, color: '#333' }}>
-                      {explicacion.h || 14}<span style={{ fontSize: '0.7rem', color: '#888' }}>d</span>
-                    </div>
-                  </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                {/* Semáforo */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', paddingTop: '2px' }}>
+                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: dotColor === '#27ae60' ? '#27ae60' : '#ddd', boxShadow: dotColor === '#27ae60' ? '0 0 6px #27ae60aa' : 'none' }} />
+                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: dotColor === '#f39c12' ? '#f39c12' : '#ddd', boxShadow: dotColor === '#f39c12' ? '0 0 6px #f39c12aa' : 'none' }} />
+                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: (dotColor === '#e74c3c' || dotColor === '#e67e22') ? dotColor : '#ddd', boxShadow: (dotColor === '#e74c3c' || dotColor === '#e67e22') ? `0 0 6px ${dotColor}aa` : 'none' }} />
                 </div>
-
-                {/* Fila 3: Razón principal */}
-                <div style={{
-                  fontSize: '0.76rem', color: '#666',
-                  borderTop: '1px solid #e8eaed', paddingTop: '6px'
-                }}>
-                  {reasonText(a)}
+                {/* Texto */}
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: dotColor, marginBottom: '3px' }}>
+                    {confLabel}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#555', lineHeight: 1.4, maxWidth: 200 }}>
+                    {confText}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>
+                    <Calendar size={12} strokeWidth={2.5} color="#64748b" />
+                    Para los próximos {explicacion.h || 14} días
+                  </div>
                 </div>
               </div>
             </td>
@@ -306,15 +270,18 @@ export default function AlertsAndSuggestions() {
                 type="button"
                 className="btn primary"
                 onClick={() => onResolve(a.id)}
-                style={{ marginRight: '8px' }}
+                style={{ marginRight: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
+                <CheckCircle2 size={16} />
                 Aprobar
               </button>
               <button
                 type="button"
                 className="btn danger"
                 onClick={() => onResolve(a.id)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
+                <XCircle size={16} />
                 Rechazar
               </button>
             </td>
@@ -442,7 +409,7 @@ export default function AlertsAndSuggestions() {
                   <tr>
                     <th scope="col">MEDICAMENTO</th>
                     <th scope="col">CANTIDAD SUGERIDA</th>
-                    <th scope="col">ANÁLISIS DE PREDICCIÓN</th>
+                    <th scope="col">CONFIANZA</th>
                     <th scope="col">ESTADO</th>
                     <th scope="col" className="text-right">ACCIONES</th>
                   </tr>

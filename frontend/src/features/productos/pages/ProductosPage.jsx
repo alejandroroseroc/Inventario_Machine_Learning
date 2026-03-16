@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import "../../../styles/productos.css";
 import ProductoForm from "../components/ProductoForm";
 import ProductoTable from "../components/ProductoTable";
+import { FileUp, ArrowLeft } from "lucide-react";
 import { importarCSV } from "../importService";
 import { productoCreate, productosList } from "../service";
 
@@ -65,10 +66,19 @@ export default function ProductosPage() {
             className="btn btn--secondary"
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#1e293b' }}
           >
-            {importing ? "Importando..." : "📁 Importar CSV"}
+            <FileUp size={18} color="#4f46e5" strokeWidth={2.5} />
+            {importing ? "Importando..." : "Importar CSV"}
           </button>
-          <Link to="/panel" className="btn">⬅️ Volver al Panel</Link>
+          <Link 
+            to="/panel" 
+            className="btn" 
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#1e293b' }}
+          >
+            <ArrowLeft size={18} color="#64748b" strokeWidth={2.5} />
+            Volver al Panel
+          </Link>
         </div>
       </div>
 

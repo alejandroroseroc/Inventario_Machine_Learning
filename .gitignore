@@ -1,15 +1,27 @@
-﻿# Python / Django
+# Python / Django
 .venv/
+venv/
+backend/.venv/
+backend/venv/
 backend/db.sqlite3
 **/__pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.sqlite3
+backend/staticfiles/
+
+# Entornos / Secretos
+backend/.env
+frontend/.env
+*.env
+
+# Archivos temporales
+backend/$null
 
 # Node / Frontend
 frontend/node_modules/
-frontend/.env
+frontend/dist/
 
 # SO
 .DS_Store

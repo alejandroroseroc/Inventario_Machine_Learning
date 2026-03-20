@@ -59,9 +59,6 @@ class AlertasStockRecalcularPredictView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # Asegurar que las categorías ABC y ROP base estén al día antes de predecir
-        recalcular_productos()
-        
         try:
             h = int(request.query_params.get("h", 14))
         except ValueError:
@@ -75,6 +72,9 @@ class AlertasStockRecalcularPredictView(APIView):
                 user_to_process = User.objects.get(id=usuario_id)
             except User.DoesNotExist:
                 return Response({"detail": "Usuario no encontrado."}, status=404)
+
+        # Asegurar que las categorías ABC y ROP base estén al día antes de predecir
+        recalcular_productos(usuario=user_to_process)
 
         creadas = 0
         procesados = 0

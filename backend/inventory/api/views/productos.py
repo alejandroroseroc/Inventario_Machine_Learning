@@ -53,7 +53,7 @@ class RecalcularProductosView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        res = recalcular_productos()
+        res = recalcular_productos(usuario=request.user)
         return Response(res, status=status.HTTP_200_OK)
 
 
@@ -80,9 +80,14 @@ class ProductoForecastView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk):
+        try:
+            producto = Producto.objects.get(id=pk, usuario=request.user)
+        except Producto.DoesNotExist:
+            return Response({"detail": "Producto no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
         qs = (
             Movimiento.objects
-            .filter(producto_id=pk, tipo="salida")
+            .filter(producto=producto, tipo="salida")
             .annotate(mes=TruncMonth("fecha_mov"))
             .values("mes")
             .annotate(total=Sum("cantidad"))
@@ -119,7 +124,7 @@ class ProductoForecastDailyView(APIView):
             return Response({"detail": "h inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            p = Producto.objects.get(id=pk)
+            p = Producto.objects.get(id=pk, usuario=request.user)
         except Producto.DoesNotExist:
             return Response({"detail": "Producto no existe."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -162,6 +167,11 @@ class ProductoRopSugerirView(APIView):
 
     def get(self, request, pk):
         try:
+            producto = Producto.objects.get(id=pk, usuario=request.user)
+        except Producto.DoesNotExist:
+            return Response({"detail": "Producto no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
             lookback = int(request.query_params.get("lookback", 90))
             lead_time = int(request.query_params.get("lead_time", 5))
             ss = int(request.query_params.get("ss", 0))
@@ -173,7 +183,7 @@ class ProductoRopSugerirView(APIView):
 
         total = (
             Movimiento.objects
-            .filter(producto_id=pk, tipo="salida", fecha_mov__gte=ini, fecha_mov__lte=fin)
+            .filter(producto=producto, tipo="salida", fecha_mov__gte=ini, fecha_mov__lte=fin)
             .aggregate(s=Sum("cantidad"))["s"] or 0
         )
         promedio_diario = total / max(1, lookback)

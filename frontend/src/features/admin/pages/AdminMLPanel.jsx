@@ -151,7 +151,7 @@ export default function AdminMLPanel() {
     setLoading(true);
     try {
       const { http } = await import("../../../api/http");
-      await http.delete(`/auth/users/${selectedUser}`, { auth: true });
+      await http.del(`/auth/users/${selectedUser}`, { auth: true });
       alert("Usuario eliminado correctamente.");
       setSelectedUser("");
       const resp = await http.get("/auth/users", { auth: true });

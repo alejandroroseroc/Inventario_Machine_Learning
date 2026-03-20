@@ -54,7 +54,7 @@ export default function ProductoDetailPage() {
         setForecast(f);
         setLotes(ls || []);
 
-        setPorVencer(pv.results || pv.items || []);
+        setPorVencer(Array.isArray(pv) ? pv : (pv?.results || pv?.items || []));
 
       } catch {
         setError("No se pudo cargar el producto.");
@@ -69,7 +69,7 @@ export default function ProductoDetailPage() {
     const ls = await lotesService.listByProducto(id).catch(() => []);
     setLotes(ls || []);
     const pv = await lotesService.porVencer({ productoId: id, dias: 60 }).catch(() => []);
-    setPorVencer(pv.items ?? []);
+    setPorVencer(Array.isArray(pv) ? pv : (pv?.results || pv?.items || []));
   };
 
   const handleChange = (e) => {

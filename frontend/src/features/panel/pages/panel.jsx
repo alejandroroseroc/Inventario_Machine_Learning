@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import "../../../styles/panel.css";
 import { getKpis } from "../api";
 
-import KpiCard from "../components/kpiCard.jsx";
+import KpiCard from "../components/KpiCard.jsx";
 import MlSummaryCard from "../components/MlSummaryCard.jsx";
 import RecentEvents from "../components/RecentEvents.jsx";
 import SalesChart from "../components/SalesChart.jsx";

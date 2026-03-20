@@ -27,12 +27,12 @@ def _calcular_rop(producto):
     return max(0, int(rop))
 
 
-def _clasificacion_abc():
+def _clasificacion_abc(usuario=None):
     """Calcula la clasificación ABC basada en ingresos con ventana flexible."""
-    ingresos = ingresos_por_producto(dias=ABC_WINDOW_DAYS)
+    ingresos = ingresos_por_producto(dias=ABC_WINDOW_DAYS, usuario=usuario)
     if not ingresos or sum(float(v or 0) for v in ingresos.values()) <= 0:
         # Fallback a 180 días si los últimos 30 están vacíos
-        ingresos = ingresos_por_producto(dias=180)
+        ingresos = ingresos_por_producto(dias=180, usuario=usuario)
         
     if not ingresos:
         return {}
@@ -93,11 +93,14 @@ def registrar_producto(data, usuario):
 
 
 @transaction.atomic
-def recalcular_productos():
-    """Recalcula ROP y categoría ABC para todos los productos."""
-    mapa = _clasificacion_abc()
+def recalcular_productos(usuario=None):
+    """Recalcula ROP y categoría ABC para los productos del usuario."""
+    mapa = _clasificacion_abc(usuario=usuario)
     updated = 0
-    for p in Producto.objects.all():
+    qs = Producto.objects.all()
+    if usuario:
+        qs = qs.filter(usuario=usuario)
+    for p in qs:
         new_rop = _calcular_rop(p)
         new_cat = mapa.get(p.id, "C")
         if p.punto_reorden != new_rop or p.categoria != new_cat:

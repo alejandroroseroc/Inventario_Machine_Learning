@@ -43,18 +43,6 @@ class MeView(APIView):
         u = request.user
         return Response({"id": u.id, "email": u.email})
 
-class InitAdminView(APIView):
-    permission_classes = [permissions.AllowAny]
-    def get(self, request):
-        from django.contrib.auth.models import User
-        email = 'admin@admin.com'
-        password = 'admin1234'
-        user, created = User.objects.get_or_create(username=email, email=email)
-        user.set_password(password)
-        user.is_staff = True
-        user.is_superuser = True
-        user.save()
-        return Response({"message": f"Superusuario {email} configurado. Contraseña: {password}"})
 
 class UserListView(APIView):
     permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]

@@ -13,7 +13,7 @@ def obtener_lotes(producto_id: int):
     return list(lotes_de_producto(producto_id))
 
 
-def registrar_lote(payload: dict):
+def registrar_lote(payload: dict, usuario=None):
     """Registra un nuevo lote para un producto."""
     try:
         producto_id = int(payload.get("producto"))
@@ -32,6 +32,13 @@ def registrar_lote(payload: dict):
 
     if not Producto.objects.filter(id=producto_id).exists():
         raise ValidationError("Producto no encontrado.")
+
+    # Validar que el producto pertenece al usuario
+    if usuario:
+        producto = Producto.objects.get(id=producto_id)
+        if producto.usuario != usuario:
+            raise ValidationError("El producto no pertenece al usuario.")
+
     if stock_lote < 0:
         raise ValidationError("El stock del lote no puede ser negativo.")
     if not fecha_caducidad:

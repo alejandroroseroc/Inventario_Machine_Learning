@@ -34,7 +34,7 @@ class LoteListCreateView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         try:
-            lote = registrar_lote(request.data)
+            lote = registrar_lote(request.data, usuario=request.user)
         except ValidationError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         ser = LoteSerializer(lote)

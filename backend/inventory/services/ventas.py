@@ -61,6 +61,8 @@ def crear_venta(items, user=None):
         lote_id = it.get("lote")
 
         prod = Producto.objects.select_for_update().get(id=pid)
+        if user and prod.usuario != user:
+            raise ValidationError(f"El producto {pid} no pertenece al usuario.")
 
         if lote_id:
             lote = (Lote.objects.select_for_update()
@@ -95,6 +97,8 @@ def anular_venta(venta_id, user=None):
     Marca venta como anulada y repone stock con movimientos 'entrada'.
     """
     venta = Venta.objects.select_for_update().get(pk=venta_id)
+    if user and venta.usuario != user:
+        raise ValidationError("Esta venta no pertenece al usuario.")
     if venta.anulada:
         return venta
 

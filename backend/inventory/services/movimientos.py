@@ -34,6 +34,9 @@ def registrar_movimiento(
     except Producto.DoesNotExist:
         raise MovimientoValidationError("Producto no encontrado.")
 
+    if usuario and producto.usuario != usuario:
+        raise MovimientoValidationError("El producto no pertenece al usuario.")
+
     if tipo not in ("entrada", "salida", "ajuste"):
         raise MovimientoValidationError("Tipo de movimiento inválido.")
 

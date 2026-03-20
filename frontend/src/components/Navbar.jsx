@@ -15,7 +15,8 @@ export default function Navbar() {
     if (!isAuth) return;
     listLotesPorVencer({ dias: 60 })
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        const items = Array.isArray(data) ? data : (data?.results || []);
+        if (items.length > 0) {
           setHasAlerts(true);
         }
       })

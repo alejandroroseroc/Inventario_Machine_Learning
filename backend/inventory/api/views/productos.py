@@ -150,6 +150,7 @@ class ProductoForecastDailyView(APIView):
                 "r2": round(res.r2, 4),
                 "mae": round(res.mae, 2),
                 "rmse": round(res.rmse, 2),
+                "wape": round(res.wape, 4),
                 "safety": int(res.safety),
             },
             "historico": res.historico,

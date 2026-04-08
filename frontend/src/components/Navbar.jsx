@@ -28,7 +28,7 @@ export default function Navbar() {
   const [criticalItems, setCriticalItems] = useState([]);
 
   useEffect(() => {
-    if (!isAuth) return undefined;
+    if (!isAuth || isAdmin) return undefined;
 
     const handleClickOutside = (event) => {
       if (panelRef.current && !panelRef.current.contains(event.target)) {
@@ -38,10 +38,10 @@ export default function Navbar() {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isAuth]);
+  }, [isAuth, isAdmin]);
 
   useEffect(() => {
-    if (!isAuth) return;
+    if (!isAuth || isAdmin) return;
 
     let cancelled = false;
 
@@ -98,7 +98,7 @@ export default function Navbar() {
     return () => {
       cancelled = true;
     };
-  }, [isAuth, pathname]);
+  }, [isAuth, isAdmin, pathname]);
 
   const allNotifications = useMemo(() => {
     return [...expiringItems, ...criticalItems]
@@ -153,59 +153,61 @@ export default function Navbar() {
         <div className="nav__spacer" />
 
         <div className="nav__actions">
-          <div className="nav__notif" ref={panelRef}>
-            <button
-              type="button"
-              className={`nav__notifBtn ${hasCritical ? "nav__notifBtn--critical" : ""}`}
-              aria-label={totalCount > 0 ? `${totalCount} notificaciones` : "Sin notificaciones"}
-              aria-expanded={open}
-              onClick={() => setOpen((prev) => !prev)}
-            >
-              <Bell size={20} strokeWidth={2.2} />
-              {totalCount > 0 && <span className="nav__notifBadge">{totalCount}</span>}
-            </button>
+          {!isAdmin && (
+            <div className="nav__notif" ref={panelRef}>
+              <button
+                type="button"
+                className={`nav__notifBtn ${hasCritical ? "nav__notifBtn--critical" : ""}`}
+                aria-label={totalCount > 0 ? `${totalCount} notificaciones` : "Sin notificaciones"}
+                aria-expanded={open}
+                onClick={() => setOpen((prev) => !prev)}
+              >
+                <Bell size={20} strokeWidth={2.2} />
+                {totalCount > 0 && <span className="nav__notifBadge">{totalCount}</span>}
+              </button>
 
-            {open && (
-              <div className="nav__notifPanel" role="dialog" aria-label="Notificaciones">
-                <div className="nav__notifHead">
-                  <strong>Notificaciones</strong>
-                  <Link
-                    to="/alertas/sugerencias"
-                    className="nav__notifLink"
-                    onClick={() => setOpen(false)}
-                  >
-                    Ver panel
-                  </Link>
-                </div>
+              {open && (
+                <div className="nav__notifPanel" role="dialog" aria-label="Notificaciones">
+                  <div className="nav__notifHead">
+                    <strong>Notificaciones</strong>
+                    <Link
+                      to="/alertas/sugerencias"
+                      className="nav__notifLink"
+                      onClick={() => setOpen(false)}
+                    >
+                      Ver panel
+                    </Link>
+                  </div>
 
-                <div className="nav__notifBody">
-                  {loading ? (
-                    <div className="nav__notifEmpty">Cargando...</div>
-                  ) : allNotifications.length === 0 ? (
-                    <div className="nav__notifEmpty">Sin notificaciones</div>
-                  ) : (
-                    allNotifications.map((item) => (
-                      <Link
-                        key={item.id}
-                        to="/alertas/sugerencias"
-                        className="nav__notifItem"
-                        onClick={() => setOpen(false)}
-                      >
-                        <span className={`nav__notifDot nav__notifDot--${item.prioridad}`}>
-                          <TriangleAlert size={14} strokeWidth={2.2} />
-                        </span>
-                        <span className="nav__notifText">
-                          <span className="nav__notifTitle">{item.titulo}</span>
-                          <span className="nav__notifDetail">{item.detalle}</span>
-                          <span className="nav__notifMeta">{item.estado}</span>
-                        </span>
-                      </Link>
-                    ))
-                  )}
+                  <div className="nav__notifBody">
+                    {loading ? (
+                      <div className="nav__notifEmpty">Cargando...</div>
+                    ) : allNotifications.length === 0 ? (
+                      <div className="nav__notifEmpty">Sin notificaciones</div>
+                    ) : (
+                      allNotifications.map((item) => (
+                        <Link
+                          key={item.id}
+                          to="/alertas/sugerencias"
+                          className="nav__notifItem"
+                          onClick={() => setOpen(false)}
+                        >
+                          <span className={`nav__notifDot nav__notifDot--${item.prioridad}`}>
+                            <TriangleAlert size={14} strokeWidth={2.2} />
+                          </span>
+                          <span className="nav__notifText">
+                            <span className="nav__notifTitle">{item.titulo}</span>
+                            <span className="nav__notifDetail">{item.detalle}</span>
+                            <span className="nav__notifMeta">{item.estado}</span>
+                          </span>
+                        </Link>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <button className="nav__logout" onClick={onLogout}>cerrar sesion</button>
         </div>

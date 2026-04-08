@@ -5,23 +5,23 @@ import {
   RefreshCw,
   ShieldCheck,
   Trash2,
-  User
+  User,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AlertsService } from "../../../api/alerts.service";
 
 const FACTOR_LABEL = (f) => {
   if (f === "ma7") return "Tendencia (MA7)";
-  if (f === "lag1") return "Último día";
+  if (f === "lag1") return "Ultimo dia";
   if (f === "lag7") return "Hace 1 semana";
   if (f === "es_quincena") return "Efecto quincena";
   if (f === "es_fin_mes") return "Fin de mes";
   if (typeof f === "string" && f.startsWith("dow_")) {
     const k = parseInt(f.split("_")[1], 10);
-    const map = { 1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado" };
+    const map = { 1: "Lunes", 2: "Martes", 3: "Miercoles", 4: "Jueves", 5: "Viernes", 6: "Sabado" };
     return map[k] || f;
   }
-  return f || "—";
+  return f || "-";
 };
 
 const asArray = (x) => {
@@ -37,35 +37,87 @@ const parseSuggestedUnits = (msg) => {
   return m ? Number(m[1]) : null;
 };
 
-function ConfBadge({ r2 }) {
-  if (r2 == null) return <span style={{ color: "#94a3b8" }}>—</span>;
-  const pct = Math.max(0, Math.min(100, Math.round(r2 * 100)));
-  let color = "#ef4444", label = "Baja";
-  if (r2 > 0.95) { color = "#f97316"; label = "Overfitting"; }
-  else if (r2 >= 0.80) { color = "#22c55e"; label = "Alta"; }
-  else if (r2 >= 0.60) { color = "#eab308"; label = "Moderada"; }
+function getConfidenceMeta(exp = {}) {
+  const r2 = Number.isFinite(exp?.r2) ? exp.r2 : null;
+  const wape = Number.isFinite(exp?.wape) ? exp.wape : null;
+
+  const r2Score = r2 == null ? 0 : Math.max(0, Math.min(1, r2));
+  const wapeScore = wape == null ? r2Score : Math.max(0, Math.min(1, 1 - wape));
+  const score = Math.round(((r2Score * 0.35) + (wapeScore * 0.65)) * 100);
+
+  let color = "#ef4444";
+  let label = "Baja";
+  if (score >= 75) {
+    color = "#22c55e";
+    label = "Alta";
+  } else if (score >= 55) {
+    color = "#eab308";
+    label = "Moderada";
+  }
+
+  return { score, color, label };
+}
+
+function ConfBadge({ exp }) {
+  const meta = getConfidenceMeta(exp);
+  const r2 = Number.isFinite(exp?.r2) ? exp.r2 : null;
+  const r2Pct = r2 == null ? null : Math.max(0, Math.min(100, Math.round(r2 * 100)));
+
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-      <span style={{
-        background: color, color: "#fff", borderRadius: 6,
-        padding: "3px 10px", fontSize: "0.7rem", fontWeight: 700,
-        textTransform: "uppercase"
-      }}>{label}</span>
-      <span style={{ color: "#64748b", fontSize: "0.85rem", fontWeight: 600 }}>{pct}%</span>
-    </span>
+    <div style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span
+          style={{
+            background: meta.color,
+            color: "#fff",
+            borderRadius: 6,
+            padding: "3px 10px",
+            fontSize: "0.7rem",
+            fontWeight: 700,
+            textTransform: "uppercase",
+          }}
+        >
+          {meta.label}
+        </span>
+        <span style={{ color: "#64748b", fontSize: "0.85rem", fontWeight: 600 }}>{meta.score}%</span>
+      </span>
+      <span style={{ color: "#94a3b8", fontSize: "0.75rem", fontWeight: 600 }}>
+        R² {r2Pct == null ? "-" : `${r2Pct}%`}
+      </span>
+    </div>
   );
 }
 
 function Chip({ label, value, Icon }) {
   return (
-    <div style={{
-      background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0",
-      padding: "16px 24px", textAlign: "left", flex: "1", minWidth: 160,
-      boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-      display: "flex", justifyContent: "space-between", alignItems: "flex-start"
-    }}>
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 14,
+        border: "1px solid #e2e8f0",
+        padding: "16px 24px",
+        textAlign: "left",
+        flex: "1",
+        minWidth: 160,
+        boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+      }}
+    >
       <div>
-        <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", marginBottom: 6, letterSpacing: 0.5 }}>{label}</div>
+        <div
+          style={{
+            fontSize: "0.75rem",
+            color: "#64748b",
+            fontWeight: 600,
+            textTransform: "uppercase",
+            marginBottom: 6,
+            letterSpacing: 0.5,
+          }}
+        >
+          {label}
+        </div>
         <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#1e293b" }}>{value}</div>
       </div>
       {Icon && <Icon size={20} color="#94a3b8" strokeWidth={2.5} />}
@@ -76,14 +128,20 @@ function Chip({ label, value, Icon }) {
 function ModelBadge({ modelo }) {
   const isXgb = modelo === "xgboost";
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 6,
-      background: isXgb ? "#ede9fe" : "#dbeafe",
-      color: isXgb ? "#7c3aed" : "#2563eb",
-      padding: "5px 12px", borderRadius: 8,
-      fontSize: "0.75rem", fontWeight: 700,
-      border: `1px solid ${isXgb ? "#ddd6fe" : "#bfdbfe"}`
-    }}>
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        background: isXgb ? "#ede9fe" : "#dbeafe",
+        color: isXgb ? "#7c3aed" : "#2563eb",
+        padding: "5px 12px",
+        borderRadius: 8,
+        fontSize: "0.75rem",
+        fontWeight: 700,
+        border: `1px solid ${isXgb ? "#ddd6fe" : "#bfdbfe"}`,
+      }}
+    >
       <Database size={13} strokeWidth={2.5} />
       {isXgb ? "XGBoost" : "Reg. Lineal"}
     </span>
@@ -105,7 +163,7 @@ export default function AdminMLPanel() {
         const resp = await http.get("/auth/users", { auth: true });
         setPharmacists(Array.isArray(resp) ? resp : []);
       } catch (e) {
-        console.error("Error al cargar farmacéuticos", e);
+        console.error("Error al cargar farmaceuticos", e);
       }
     };
     fetchUsers();
@@ -117,7 +175,7 @@ export default function AdminMLPanel() {
     try {
       const alerts = await AlertsService.list({
         estado,
-        usuario_id: selectedUser || null
+        usuario_id: selectedUser || null,
       });
       setMlAlerts(asArray(alerts));
     } catch (e) {
@@ -127,7 +185,9 @@ export default function AdminMLPanel() {
     }
   };
 
-  useEffect(() => { cargar(); }, [estado, selectedUser]);
+  useEffect(() => {
+    cargar();
+  }, [estado, selectedUser]);
 
   const onRecalc = async () => {
     setLoading(true);
@@ -144,8 +204,10 @@ export default function AdminMLPanel() {
 
   const onDeleteUser = async () => {
     if (!selectedUser) return;
-    const userObj = pharmacists.find(u => String(u.id) === String(selectedUser));
-    const confirmPopup = window.confirm(`¿Estás seguro de que deseas eliminar al usuario "${userObj?.username || userObj?.email}"? Esta acción no se puede deshacer.`);
+    const userObj = pharmacists.find((u) => String(u.id) === String(selectedUser));
+    const confirmPopup = window.confirm(
+      `¿Estas seguro de que deseas eliminar al usuario "${userObj?.username || userObj?.email}"? Esta accion no se puede deshacer.`,
+    );
     if (!confirmPopup) return;
 
     setLoading(true);
@@ -165,90 +227,143 @@ export default function AdminMLPanel() {
 
   const metrics = useMemo(() => {
     const total = mlAlerts.length;
-    const alta = mlAlerts.filter((a) => (a.explicacion?.r2 ?? 0) >= 0.80 && (a.explicacion?.r2 ?? 0) <= 0.95).length;
+    const alta = mlAlerts.filter((a) => getConfidenceMeta(a.explicacion).label === "Alta").length;
     const xgb = mlAlerts.filter((a) => a.explicacion?.modelo === "xgboost").length;
     const lin = mlAlerts.filter((a) => a.explicacion?.modelo === "linear" || a.explicacion?.modelo === "lineal").length;
     return { total, alta, xgb, lin };
   }, [mlAlerts]);
 
-  const rows = useMemo(() =>
-    mlAlerts.map((a) => {
-      const exp = a.explicacion || {};
-      const cant = parseSuggestedUnits(a.mensaje);
-      const topFactor = exp.top?.[0]?.factor;
-      const barcode = a.productoCodigoBarras;
-      return (
-        <tr key={a.id}>
-          <td>
-            <div style={{ fontWeight: 700, color: "#1e293b", marginBottom: 3 }}>
-              {a.producto_nombre || a.productoNombre || "—"}
-            </div>
-            <div style={{ fontFamily: "monospace", fontSize: "0.75rem", color: "#64748b", background: "#f1f5f9", padding: "1px 6px", borderRadius: 4, display: "inline-block" }}>
-              {barcode || a.productoCodigo || "Sin ID"}
-            </div>
-          </td>
-          <td><ModelBadge modelo={exp.modelo} /></td>
-          <td><ConfBadge r2={exp.r2} /></td>
-          <td style={{ color: "#64748b", fontFamily: "monospace" }}>
-            {exp.mae != null ? `±${exp.mae.toFixed(2)}` : "—"}
-          </td>
-          <td style={{ color: "#64748b", fontFamily: "monospace" }}>
-            {exp.rmse != null ? exp.rmse.toFixed(2) : "—"}
-          </td>
-          <td style={{ color: "#64748b" }}>{exp.h || 14}d</td>
-          <td style={{ color: "#0369a1", fontSize: "0.82rem", fontWeight: 600 }}>
-            {FACTOR_LABEL(topFactor)}
-          </td>
-          <td>
-            <strong style={{ color: "#2563eb", fontSize: "1rem" }}>
-              {Number.isFinite(cant) ? `${cant} uds` : a.mensaje}
-            </strong>
-          </td>
-        </tr>
-      );
-    }),
-    [mlAlerts]
+  const rows = useMemo(
+    () =>
+      mlAlerts.map((a) => {
+        const exp = a.explicacion || {};
+        const cant = parseSuggestedUnits(a.mensaje);
+        const topFactor = exp.top?.[0]?.factor;
+        const barcode = a.productoCodigoBarras;
+        return (
+          <tr key={a.id}>
+            <td>
+              <div style={{ fontWeight: 700, color: "#1e293b", marginBottom: 3 }}>
+                {a.producto_nombre || a.productoNombre || "-"}
+              </div>
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: "0.75rem",
+                  color: "#64748b",
+                  background: "#f1f5f9",
+                  padding: "1px 6px",
+                  borderRadius: 4,
+                  display: "inline-block",
+                }}
+              >
+                {barcode || a.productoCodigo || "Sin ID"}
+              </div>
+            </td>
+            <td>
+              <ModelBadge modelo={exp.modelo} />
+            </td>
+            <td>
+              <ConfBadge exp={exp} />
+            </td>
+            <td style={{ color: "#64748b", fontFamily: "monospace" }}>
+              {exp.mae != null ? `±${exp.mae.toFixed(2)}` : "-"}
+            </td>
+            <td style={{ color: "#64748b", fontFamily: "monospace" }}>
+              {exp.rmse != null ? exp.rmse.toFixed(2) : "-"}
+            </td>
+            <td style={{ color: "#64748b", fontFamily: "monospace" }}>
+              {exp.wape != null ? `${Math.round(exp.wape * 100)}%` : "-"}
+            </td>
+            <td style={{ color: "#64748b" }}>{exp.h || 14}d</td>
+            <td style={{ color: "#0369a1", fontSize: "0.82rem", fontWeight: 600 }}>
+              {FACTOR_LABEL(topFactor)}
+            </td>
+            <td>
+              <strong style={{ color: "#2563eb", fontSize: "1rem" }}>
+                {Number.isFinite(cant) ? `${cant} uds` : a.mensaje}
+              </strong>
+            </td>
+          </tr>
+        );
+      }),
+    [mlAlerts],
   );
 
   return (
     <section style={{ minHeight: "100vh", background: "#f8fafc", padding: "40px 32px" }}>
       <div style={{ maxWidth: 1250, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32, flexWrap: "wrap", gap: 20 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 32,
+            flexWrap: "wrap",
+            gap: 20,
+          }}
+        >
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                background: "#eff6ff", color: "#2563eb", padding: "5px 12px", borderRadius: 8,
-                fontSize: "0.75rem", fontWeight: 700, letterSpacing: 0.5, border: "1px solid #dbeafe"
-              }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "#eff6ff",
+                  color: "#2563eb",
+                  padding: "5px 12px",
+                  borderRadius: 8,
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  border: "1px solid #dbeafe",
+                }}
+              >
                 <ShieldCheck size={14} strokeWidth={2.5} />
                 SOLO ADMINISTRADOR
               </span>
             </div>
             <h1 style={{ color: "#1e293b", margin: 0, fontSize: "2rem", fontWeight: 850, letterSpacing: "-0.02em" }}>
-              Panel de Predicción ML
+              Panel de Prediccion ML
             </h1>
             <p style={{ color: "#64748b", margin: "6px 0 0", fontSize: "1rem", fontWeight: 500 }}>
-              Métricas técnicas y supervisión de modelos de aprendizaje automático
+              Metricas tecnicas y supervision de modelos de aprendizaje automatico
             </p>
           </div>
 
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", padding: "8px 14px", borderRadius: 12, border: "1px solid #e2e8f0" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                background: "#fff",
+                padding: "8px 14px",
+                borderRadius: 12,
+                border: "1px solid #e2e8f0",
+              }}
+            >
               <User size={16} color="#64748b" strokeWidth={2.5} />
-              <span style={{ color: "#64748b", fontSize: "0.85rem", fontWeight: 700 }}>Farmacéutico:</span>
+              <span style={{ color: "#64748b", fontSize: "0.85rem", fontWeight: 700 }}>Farmaceutico:</span>
               <select
                 value={selectedUser}
                 onChange={(e) => setSelectedUser(e.target.value)}
                 style={{
-                  background: "transparent", border: "none",
-                  color: "#1e293b", fontSize: "0.85rem", fontWeight: 600,
-                  outline: "none", cursor: "pointer"
+                  background: "transparent",
+                  border: "none",
+                  color: "#1e293b",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  outline: "none",
+                  cursor: "pointer",
                 }}
               >
                 <option value="">(Mio / Todos)</option>
-                {pharmacists.map(u => (
-                  <option key={u.id} value={u.id}>{u.username || u.email}</option>
+                {pharmacists.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.username || u.email}
+                  </option>
                 ))}
               </select>
             </div>
@@ -258,10 +373,18 @@ export default function AdminMLPanel() {
                 onClick={onDeleteUser}
                 className="btn-danger-light"
                 style={{
-                  display: "inline-flex", alignItems: "center", gap: 8,
-                  background: "#fff1f2", color: "#e11d48", border: "1px solid #fecdd3",
-                  borderRadius: 12, padding: "10px 18px", fontSize: "0.85rem", fontWeight: 700,
-                  cursor: "pointer", transition: "all 0.2s"
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "#fff1f2",
+                  color: "#e11d48",
+                  border: "1px solid #fecdd3",
+                  borderRadius: 12,
+                  padding: "10px 18px",
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
                 }}
               >
                 <Trash2 size={16} />
@@ -273,9 +396,16 @@ export default function AdminMLPanel() {
               value={estado}
               onChange={(e) => setEstado(e.target.value)}
               style={{
-                background: "#fff", border: "1px solid #e2e8f0",
-                color: "#1e293b", borderRadius: 12, padding: "12px 16px", fontSize: "0.85rem",
-                fontWeight: 700, outline: "none", cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+                color: "#1e293b",
+                borderRadius: 12,
+                padding: "12px 16px",
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                outline: "none",
+                cursor: "pointer",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
               }}
             >
               <option value="activa">Alertas Activas</option>
@@ -285,10 +415,19 @@ export default function AdminMLPanel() {
             <button
               onClick={onRecalc}
               style={{
-                display: "inline-flex", alignItems: "center", gap: 10,
-                background: "#2563eb", color: "#fff", border: "none", borderRadius: 12,
-                padding: "12px 24px", fontWeight: 750, cursor: "pointer", fontSize: "0.9rem",
-                boxShadow: "0 4px 12px rgba(37,99,235,0.2)", transition: "transform 0.2s"
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 10,
+                background: "#2563eb",
+                color: "#fff",
+                border: "none",
+                borderRadius: 12,
+                padding: "12px 24px",
+                fontWeight: 750,
+                cursor: "pointer",
+                fontSize: "0.9rem",
+                boxShadow: "0 4px 12px rgba(37,99,235,0.2)",
+                transition: "transform 0.2s",
               }}
               onMouseOver={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
               onMouseOut={(e) => (e.currentTarget.style.transform = "translateY(0)")}
@@ -307,11 +446,25 @@ export default function AdminMLPanel() {
         </div>
 
         {err && (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#fef2f2", border: "1px solid #fee2e2", color: "#b91c1c", borderRadius: 12, padding: "16px", marginBottom: 24, fontWeight: 600 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "#fef2f2",
+              border: "1px solid #fee2e2",
+              color: "#b91c1c",
+              borderRadius: 12,
+              padding: "16px",
+              marginBottom: 24,
+              fontWeight: 600,
+            }}
+          >
             <AlertCircle size={20} />
             {err}
           </div>
         )}
+
         {loading && (
           <div style={{ color: "#64748b", textAlign: "center", padding: 60, fontSize: "1.1rem", fontWeight: 500 }}>
             <div className="animate-spin" style={{ display: "inline-block", marginBottom: 12 }}>
@@ -322,29 +475,43 @@ export default function AdminMLPanel() {
         )}
 
         {!loading && !err && (
-          <div style={{
-            background: "#fff", border: "1px solid #e2e8f0",
-            borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.04)"
-          }}>
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 16,
+              overflow: "hidden",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
+            }}
+          >
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                    {["Medicamento", "Modelo", "Confianza (R²)", "MAE", "RMSE", "Horizonte", "Factor Principal", "Sugerencia"].map((h) => (
-                      <th key={h} style={{
-                        padding: "16px 20px", textAlign: "left",
-                        fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.05em",
-                        color: "#64748b", textTransform: "uppercase",
-                      }}>
+                    {["Medicamento", "Modelo", "Confianza", "MAE", "RMSE", "WAPE", "Horizonte", "Factor Principal", "Sugerencia"].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "16px 20px",
+                          textAlign: "left",
+                          fontSize: "0.75rem",
+                          fontWeight: 800,
+                          letterSpacing: "0.05em",
+                          color: "#64748b",
+                          textTransform: "uppercase",
+                        }}
+                      >
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody style={{ color: "#1e293b" }}>
-                  {mlAlerts.length ? rows : (
+                  {mlAlerts.length ? (
+                    rows
+                  ) : (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: "center", padding: 60, color: "#94a3b8", fontSize: "1rem" }}>
+                      <td colSpan={9} style={{ textAlign: "center", padding: 60, color: "#94a3b8", fontSize: "1rem" }}>
                         No hay sugerencias registradas para este filtro.
                       </td>
                     </tr>

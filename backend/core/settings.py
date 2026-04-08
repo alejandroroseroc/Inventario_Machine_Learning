@@ -21,11 +21,19 @@ SECRET_KEY = os.environ.get(
 )
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = [
-    h.strip()
-    for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-    if h.strip()
-]
+_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").strip()
+_render_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
+
+if _allowed_hosts == "*":
+    ALLOWED_HOSTS = ["*"]
+else:
+    ALLOWED_HOSTS = [
+        h.strip()
+        for h in _allowed_hosts.split(",")
+        if h.strip()
+    ]
+    if _render_hostname and _render_hostname not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_render_hostname)
 
 # ─── Apps
 INSTALLED_APPS = [
@@ -135,8 +143,21 @@ CORS_ALLOW_HEADERS = [
     "user-agent", "dnt", "cache-control", "x-requested-with"
 ]
 
-_cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
-CORS_ALLOWED_ORIGINS = [
+_cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "").strip()
+_cors_regexes = os.environ.get("CORS_ALLOWED_ORIGIN_REGEXES", "").strip()
+
+CORS_ALLOW_ALL_ORIGINS = _cors_origins == "*"
+CORS_ALLOWED_ORIGINS = [] if CORS_ALLOW_ALL_ORIGINS else [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-] + [o.strip() for o in _cors_origins.split(",") if o.strip()]
+] + [
+    o.strip()
+    for o in _cors_origins.split(",")
+    if o.strip() and o.strip() != "*"
+]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    pattern.strip()
+    for pattern in _cors_regexes.split(",")
+    if pattern.strip()
+]

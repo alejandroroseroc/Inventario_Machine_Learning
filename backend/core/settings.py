@@ -150,6 +150,7 @@ CORS_ALLOW_ALL_ORIGINS = _cors_origins == "*"
 CORS_ALLOWED_ORIGINS = [] if CORS_ALLOW_ALL_ORIGINS else [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://inventario-machine-learning-ecru.vercel.app",
 ] + [
     o.strip()
     for o in _cors_origins.split(",")
@@ -157,6 +158,8 @@ CORS_ALLOWED_ORIGINS = [] if CORS_ALLOW_ALL_ORIGINS else [
 ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
+] + [
     pattern.strip()
     for pattern in _cors_regexes.split(",")
     if pattern.strip()

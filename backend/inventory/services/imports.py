@@ -15,68 +15,6 @@ from .productos import recalcular_productos
 
 class ImportService:
     @staticmethod
-    def _compact_rows(clean_df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Compacta filas repetidas para que la importacion historica sea mucho
-        mas ligera.
-
-        Las ventas se agrupan por dia porque el modelo Venta solo guarda la
-        fecha, no la hora. Asi evitamos miles de inserts equivalentes.
-        """
-        if clean_df.empty:
-            return clean_df
-
-        work_df = clean_df.copy()
-
-        if "nombre" not in work_df:
-            work_df["nombre"] = ""
-        if "lote" not in work_df:
-            work_df["lote"] = "IMPORTADO"
-        if "tipo_movimiento" not in work_df:
-            work_df["tipo_movimiento"] = "salida"
-
-        work_df["codigo"] = work_df["codigo"].astype(str).str.strip()
-        work_df["nombre"] = work_df["nombre"].astype(str).str.strip()
-        work_df["lote"] = work_df["lote"].fillna("IMPORTADO").astype(str).str.strip()
-        work_df["tipo_movimiento"] = (
-            work_df["tipo_movimiento"]
-            .fillna("salida")
-            .astype(str)
-            .str.lower()
-            .str.strip()
-        )
-        work_df["fecha"] = pd.to_datetime(work_df["fecha"], errors="coerce").fillna(pd.Timestamp.now())
-
-        price_column = "precio_costo" if "precio_costo" in work_df.columns else None
-
-        sales_df = work_df[work_df["tipo_movimiento"] == "salida"].copy()
-        if not sales_df.empty:
-            sales_df["fecha"] = sales_df["fecha"].dt.floor("D")
-            sales_group_fields = ["codigo", "nombre", "lote", "fecha", "tipo_movimiento"]
-            if price_column:
-                sales_group_fields.append(price_column)
-            sales_df = (
-                sales_df.groupby(sales_group_fields, as_index=False)
-                .agg(cantidad=("cantidad", "sum"))
-            )
-
-        entries_df = work_df[work_df["tipo_movimiento"] != "salida"].copy()
-        if not entries_df.empty:
-            entry_group_fields = ["codigo", "nombre", "lote", "fecha", "tipo_movimiento"]
-            if price_column:
-                entry_group_fields.append(price_column)
-            entries_df = (
-                entries_df.groupby(entry_group_fields, as_index=False)
-                .agg(cantidad=("cantidad", "sum"))
-            )
-
-        compact_df = pd.concat([sales_df, entries_df], ignore_index=True, sort=False)
-        if compact_df.empty:
-            return compact_df
-
-        return compact_df.sort_values("fecha").reset_index(drop=True)
-
-    @staticmethod
     def import_from_csv(file, user) -> Tuple[int, List[str]]:
         """
         Procesa un CSV, lo limpia y guarda los datos en la BD.
@@ -96,7 +34,6 @@ class ImportService:
         if clean_df.empty:
             return 0, ["El archivo no contiene filas validas para importar."]
 
-        clean_df = ImportService._compact_rows(clean_df)
         rows = clean_df.to_dict("records")
 
         try:

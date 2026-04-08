@@ -6,6 +6,7 @@ from rest_framework.test import APIClient
 from inventory.models import Producto, Lote, Alerta
 from inventory.services.alertas import recalcular_alertas_stock_todas
 from inventory.api.serializers import ProductoSerializer
+from inventory.services.lotes import registrar_lote
 
 class FixAlertasPreciosTests(TestCase):
     def setUp(self):
@@ -99,3 +100,25 @@ class FixAlertasPreciosTests(TestCase):
         # Asegurar que la alerta 'caducidad' esta en la lista
         tipos = [r["tipo"] for r in results]
         self.assertIn("caducidad", tipos)
+
+    def test_registrar_lote_crea_alerta_de_caducidad_automatica(self):
+        prod = Producto.objects.create(
+            usuario=self.user,
+            codigo="PAUTO",
+            nombre="Producto Auto Alerta",
+            valor_unitario=1200,
+            punto_reorden=5,
+        )
+
+        lote = registrar_lote(
+            {
+                "producto": prod.id,
+                "stock_lote": 12,
+                "fecha_caducidad": (date.today() + timedelta(days=20)).isoformat(),
+                "numero_lote": "AUTO-20D",
+            },
+            usuario=self.user,
+        )
+
+        alerta = Alerta.objects.get(producto=prod, lote=lote, tipo="caducidad", estado="activa")
+        self.assertIn("vence en", alerta.mensaje)

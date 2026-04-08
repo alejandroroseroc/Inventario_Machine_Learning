@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 
 from inventory.models import Producto
 from inventory.repositories import lotes_de_producto, crear_lote
+from .alertas import asegurar_alerta_caducidad
 
 
 def obtener_lotes(producto_id: int):
@@ -46,10 +47,12 @@ def registrar_lote(payload: dict, usuario=None):
     if fecha_caducidad < date.today():
         raise ValidationError("La fecha de caducidad debe ser hoy o futura.")
 
-    return crear_lote(
+    lote = crear_lote(
         producto_id, 
         fecha_caducidad, 
         stock_lote, 
         numero_lote=payload.get("numero_lote"),
         codigo_barras=payload.get("codigo_barras")
     )
+    asegurar_alerta_caducidad(lote)
+    return lote

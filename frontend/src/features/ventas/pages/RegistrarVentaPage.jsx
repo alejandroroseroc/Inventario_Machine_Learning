@@ -43,6 +43,20 @@ export default function RegistrarVentaPage() {
   const [histFiltroMonth, setHistFiltroMonth] = useState("");
   const [histPage, setHistPage] = useState(1);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const historialRef = useRef(null);
+
+  const formatFechaHistorica = (venta) => {
+    if (venta?.created_at) {
+      return new Date(venta.created_at).toLocaleString("es-CO");
+    }
+    if (venta?.fecha) {
+      const [year, month, day] = String(venta.fecha).split("-").map(Number);
+      if (year && month && day) {
+        return new Date(year, month - 1, day).toLocaleDateString("es-CO");
+      }
+    }
+    return "-";
+  };
 
   const doSuggest = debounce(async (txt) => {
     const q = (txt || "").trim();
@@ -170,6 +184,39 @@ export default function RegistrarVentaPage() {
       alert("Venta anulada exitosamente.");
     }
     catch (e) { alert(e?.payload?.detail || e?.message || "No se pudo anular la venta."); }
+  };
+
+  const handleCierreDelDia = async () => {
+    const c = await getCierreDia().catch(() => null);
+    if (!c) return alert("No se pudo obtener el cierre.");
+
+    let nextYear = String(new Date().getFullYear());
+    let nextMonth = "";
+
+    if (c.fecha) {
+      const [year, month] = String(c.fecha).split("-");
+      nextYear = year || nextYear;
+      nextMonth = month ? String(Number(month)) : "";
+      setHistFiltroYear(nextYear);
+      setHistFiltroMonth(nextMonth);
+      setHistPage(1);
+    }
+
+    setLoadingHistorial(true);
+    try {
+      const data = await getHistorialPaginado(nextYear, nextMonth, 1);
+      setHistorialPaginado(data);
+    } catch {
+      setHistorialPaginado(null);
+    } finally {
+      setLoadingHistorial(false);
+    }
+
+    alert(`Cierre de hoy\nVentas: ${c.ventas_registradas}\nAnuladas: ${c.ventas_anuladas}\nTotal dÃ­a: $${money(c.total_dia)}`);
+
+    setTimeout(() => {
+      historialRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   return (
@@ -327,18 +374,14 @@ export default function RegistrarVentaPage() {
       <div className="actions actions--end">
         <button
           className="btn"
-          onClick={async () => {
-            const c = await getCierreDia().catch(() => null);
-            if (!c) return alert("No se pudo obtener el cierre.");
-            alert(`Cierre de hoy\nVentas: ${c.ventas_registradas}\nAnuladas: ${c.ventas_anuladas}\nTotal día: $${money(c.total_dia)}`);
-          }}
+          onClick={handleCierreDelDia}
         >
           Cierre del día
         </button>
       </div>
 
       {/* DETALLE DE VENTAS HISTÓRICAS */}
-      <div className="card" style={{ marginTop: 24 }}>
+      <div className="card" style={{ marginTop: 24 }} ref={historialRef}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0 }}>Detalle de Ventas Históricas</h2>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -396,7 +439,7 @@ export default function RegistrarVentaPage() {
                   const it = (v.items && v.items[0]) || {};
                   return (
                     <tr key={v.id} style={{ opacity: v.anulada ? 0.6 : 1 }}>
-                      <td className="mono">{v.fecha ? new Date(v.fecha).toLocaleString('es-CO') : "-"}</td>
+                      <td className="mono">{formatFechaHistorica(v)}</td>
                       <td className="font-medium">{it.producto_nombre || "-"}</td>
                       <td>{it.lote_numero ? `#${it.lote_numero}` : (it.lote ? `#${it.lote}` : "FEFO")}</td>
                       <td className="text-right">{it.cantidad ?? "-"}</td>

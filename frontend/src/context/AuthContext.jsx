@@ -4,17 +4,40 @@ import { http } from "../api/http";
 const Ctx = createContext(null);
 export const useAuth = () => useContext(Ctx);
 
+/** Verifica si un JWT ha expirado (con 30s de margen) */
+function isTokenExpired(token) {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    // exp está en segundos
+    return payload.exp * 1000 < Date.now() - 30_000;
+  } catch {
+    return true;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [isAuth, setIsAuth] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [ready, setReady]   = useState(false);
 
-  // Bootstrap: leer tokens al recargar
+  // Bootstrap: leer tokens al recargar y validar expiración
   useEffect(() => {
     const t = localStorage.getItem("access");
     const adminFlag = localStorage.getItem("is_admin") === "true";
-    setIsAuth(Boolean(t));
-    setIsAdmin(adminFlag);
+
+    if (t && !isTokenExpired(t)) {
+      setIsAuth(true);
+      setIsAdmin(adminFlag);
+    } else {
+      // Token inválido o expirado: limpiar
+      localStorage.removeItem("access");
+      localStorage.removeItem("refresh");
+      localStorage.removeItem("token");
+      localStorage.removeItem("is_admin");
+      setIsAuth(false);
+      setIsAdmin(false);
+    }
     setReady(true);
   }, []);
 

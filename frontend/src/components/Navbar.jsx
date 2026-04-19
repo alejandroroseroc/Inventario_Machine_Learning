@@ -113,7 +113,9 @@ export default function Navbar() {
   const totalCount = expiringItems.length + criticalItems.length;
   const hasCritical = criticalItems.length > 0;
 
-  if (!isAuth) return null;
+  // Ocultar navbar en rutas de auth o si no hay sesión
+  const isAuthPage = pathname === "/login" || pathname === "/register";
+  if (!isAuth || isAuthPage) return null;
 
   const active = (p) => (pathname.startsWith(p) ? "nav__link nav__link--active" : "nav__link");
   const onLogout = () => {

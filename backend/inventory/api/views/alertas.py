@@ -62,7 +62,7 @@ class AlertasStockRecalcularPredictView(APIView):
         try:
             h = int(request.query_params.get("h", 14))
         except ValueError:
-            return Response({"detail": "Parámetro h inválido."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Parametro h invalido."}, status=status.HTTP_400_BAD_REQUEST)
 
         usuario_id = request.query_params.get("usuario_id")
         user_to_process = request.user
@@ -73,7 +73,7 @@ class AlertasStockRecalcularPredictView(APIView):
             except User.DoesNotExist:
                 return Response({"detail": "Usuario no encontrado."}, status=404)
 
-        # Asegurar que las categorías ABC y ROP base estén al día antes de predecir
+        # Asegurar que las categorias ABC y ROP base esten al dia antes de predecir
         recalcular_productos(usuario=user_to_process)
 
         creadas = 0
@@ -97,16 +97,24 @@ class AlertasStockRecalcularPredictView(APIView):
                 continue
 
             disponible = int(p.get("stock_total") or 0)
-            
-            # Calculamos la sugerencia, pero permitimos que sea 0 para mostrar el análisis ML
-            sugerido = max(0, int(round(res.yhat_total)) + int(res.safety) - disponible)
-            
-            # Mostramos el sugerido si es > 0, o 0 si el stock es suficiente
-            if sugerido > 0:
-                msg = f"Sugerido comprar {sugerido} uds para {h} días"
+
+            # Generar mensaje segun el estado del modelo
+            if res.modelo in ("insuficiente", "error"):
+                sugerido = 0
+                msg = "Sin historial suficiente para predecir demanda"
+            elif res.modelo == "actividad_insuficiente":
+                sugerido = 0
+                msg = "Demanda muy baja o nula. Verificar rotacion del producto"
             else:
-                msg = f"Stock óptimo. Predisposición de {int(round(res.yhat_total))} uds en {h} días"
-            
+                sugerido = max(0, int(round(res.yhat_total)) + int(res.safety) - disponible)
+
+                if sugerido > 0:
+                    msg = f"Sugerido comprar {sugerido} uds para {h} dias"
+                elif int(round(res.yhat_total)) == 0:
+                    msg = f"Demanda predicha: 0 uds en {h} dias. Verificar rotacion"
+                else:
+                    msg = f"Stock optimo. Prediccion de {int(round(res.yhat_total))} uds en {h} dias"
+
             top1 = (res.top_factors or [{"factor": "tendencia"}])[0]["factor"]
             explicacion = {
                 "modelo": res.modelo,

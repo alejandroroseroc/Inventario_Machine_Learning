@@ -57,6 +57,17 @@ const asArray = (value) => {
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 
 const getConfidenceMeta = (exp = {}) => {
+  // Modelos sin datos suficientes → gris, sin confianza
+  if (exp.modelo === "insuficiente" || exp.modelo === "actividad_insuficiente" || exp.modelo === "error") {
+    return {
+      score: 0,
+      label: "Sin datos",
+      color: "#94a3b8",
+      text: "No hay ventas recientes suficientes para generar una prediccion confiable.",
+      detail: "Se requiere historial de ventas para sugerir cantidades.",
+    };
+  }
+
   const r2 = Number.isFinite(exp?.r2) ? exp.r2 : null;
   const wape = Number.isFinite(exp?.wape) ? exp.wape : null;
   const mae = Number.isFinite(exp?.mae) ? exp.mae : null;
@@ -93,6 +104,7 @@ const getConfidenceMeta = (exp = {}) => {
     detail: mae == null ? "Validar con el equipo" : `Error medio diario aprox.: ${mae.toFixed(2)} uds`,
   };
 };
+
 
 export default function AlertsAndSuggestions() {
   const [tab, setTab] = useState("caducan");
@@ -154,9 +166,19 @@ export default function AlertsAndSuggestions() {
     }
   };
 
+  const filteredExpiring = useMemo(() => {
+    if (!searchTerm) return expiring;
+    const lower = searchTerm.toLowerCase();
+    return expiring.filter(row => {
+        const name = (row.productoNombre || "").toLowerCase();
+        const lote = (row.numeroLote || "").toLowerCase();
+        return name.includes(lower) || lote.includes(lower);
+    });
+  }, [expiring, searchTerm]);
+
   const rowsCaducan = useMemo(
     () =>
-      expiring.map((row, index) => {
+      filteredExpiring.map((row, index) => {
         const dias = row.diasRestantes;
         const caducado = dias != null && dias < 0;
         const estadoDia = dias == null ? "-" : caducado ? "Caducada" : dias;
@@ -185,12 +207,22 @@ export default function AlertsAndSuggestions() {
           </tr>
         );
       }),
-    [expiring],
+    [filteredExpiring],
   );
+
+  const filteredMlAlerts = useMemo(() => {
+    if (!searchTerm) return mlAlerts;
+    const lower = searchTerm.toLowerCase();
+    return mlAlerts.filter(a => {
+        const name = (a.producto_nombre || a.productoNombre || "").toLowerCase();
+        const code = (a.productoCodigoBarras || a.productoCodigo || "").toLowerCase();
+        return name.includes(lower) || code.includes(lower);
+    });
+  }, [mlAlerts, searchTerm]);
 
   const rowsReorden = useMemo(
     () =>
-      mlAlerts.map((alerta) => {
+      filteredMlAlerts.map((alerta) => {
         const cant = parseSuggestedUnits(alerta.mensaje);
         const explicacion = alerta.explicacion || {};
         const meta = getConfidenceMeta(explicacion);
@@ -298,30 +330,32 @@ export default function AlertsAndSuggestions() {
               <span className="tag tag-blue">Sugerencia ML</span>
             </td>
 
-            <td className="text-right">
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => onResolve(alerta.id)}
-                style={{ marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6 }}
-              >
-                <CheckCircle2 size={16} />
-                Aprobar
-              </button>
-              <button
-                type="button"
-                className="btn danger"
-                onClick={() => onResolve(alerta.id)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              >
-                <XCircle size={16} />
-                Rechazar
-              </button>
+            <td className="text-right" style={{ verticalAlign: "middle" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => onResolve(alerta.id)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "115px", justifyContent: "flex-start" }}
+                >
+                  <CheckCircle2 size={16} />
+                  Aprobar
+                </button>
+                <button
+                  type="button"
+                  className="btn danger"
+                  onClick={() => onResolve(alerta.id)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "115px", justifyContent: "flex-start" }}
+                >
+                  <XCircle size={16} />
+                  Rechazar
+                </button>
+              </div>
             </td>
           </tr>
         );
       }),
-    [mlAlerts],
+    [filteredMlAlerts],
   );
 
   return (
@@ -406,12 +440,12 @@ export default function AlertsAndSuggestions() {
                   </tr>
                 </thead>
                 <tbody>
-                  {expiring.length ? (
+                  {filteredExpiring.length ? (
                     rowsCaducan
                   ) : (
                     <tr>
                       <td colSpan={6} style={{ textAlign: "center", padding: 20 }}>
-                        <em>No hay lotes proximos a caducar</em>
+                        <em>No hay lotes que coincidan con la busqueda o proximos a caducar</em>
                       </td>
                     </tr>
                   )}
@@ -436,12 +470,12 @@ export default function AlertsAndSuggestions() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mlAlerts.length ? (
+                  {filteredMlAlerts.length ? (
                     rowsReorden
                   ) : (
                     <tr>
                       <td colSpan={5} style={{ textAlign: "center", padding: 20 }}>
-                        <em>No hay sugerencias generadas. Haz clic en "Recalcular" para generarlas.</em>
+                        <em>No hay sugerencias generadas que coincidan con la busqueda. Haz clic en "Recalcular" para generarlas.</em>
                       </td>
                     </tr>
                   )}

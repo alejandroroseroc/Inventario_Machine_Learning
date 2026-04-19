@@ -20,10 +20,12 @@ def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 def _wape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     if len(y_true) == 0:
-        return 0.0
+        return 1.0
     denom = float(np.sum(np.abs(y_true)))
     if denom <= 0:
-        return 0.0
+        # Sin demanda real: no hay forma de medir precisión porcentual.
+        # Retornamos 0.5 (incertidumbre) para que la confianza no se infle.
+        return 0.5
     return float(np.sum(np.abs(y_true - y_pred)) / denom)
 
 
@@ -97,7 +99,9 @@ def train_and_select(
     if np.var(Y_val) > 0.001:
         r2 = float(r2_score(Y_val, pred_val))
     else:
-        r2 = 1.0 if _rmse(Y_val, pred_val) < 0.5 else 0.0
+        # Varianza ~0 = datos casi constantes (ej: todos 0).
+        # R² no tiene sentido estadístico aquí → no dar confianza artificial.
+        r2 = 0.0
 
     mae = float(mean_absolute_error(Y_val, pred_val))
     rmse = float(best["rmse"])

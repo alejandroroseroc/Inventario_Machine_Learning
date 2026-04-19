@@ -3,6 +3,7 @@ import {
   BarChart3,
   Database,
   RefreshCw,
+  Search,
   ShieldCheck,
   Trash2,
   User,
@@ -38,6 +39,11 @@ const parseSuggestedUnits = (msg) => {
 };
 
 function getConfidenceMeta(exp = {}) {
+  // Modelos sin datos suficientes
+  if (exp.modelo === "insuficiente" || exp.modelo === "actividad_insuficiente" || exp.modelo === "error") {
+    return { score: 0, color: "#94a3b8", label: "Sin datos" };
+  }
+
   const r2 = Number.isFinite(exp?.r2) ? exp.r2 : null;
   const wape = Number.isFinite(exp?.wape) ? exp.wape : null;
 
@@ -154,6 +160,7 @@ export default function AdminMLPanel() {
   const [err, setErr] = useState("");
   const [estado, setEstado] = useState("activa");
   const [selectedUser, setSelectedUser] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [pharmacists, setPharmacists] = useState([]);
 
   useEffect(() => {
@@ -225,17 +232,27 @@ export default function AdminMLPanel() {
     }
   };
 
+  const filteredAlerts = useMemo(() => {
+    if (!searchTerm) return mlAlerts;
+    const lower = searchTerm.toLowerCase();
+    return mlAlerts.filter(a => {
+      const name = (a.producto_nombre || a.productoNombre || "").toLowerCase();
+      const code = (a.productoCodigoBarras || a.productoCodigo || "").toLowerCase();
+      return name.includes(lower) || code.includes(lower);
+    });
+  }, [mlAlerts, searchTerm]);
+
   const metrics = useMemo(() => {
-    const total = mlAlerts.length;
-    const alta = mlAlerts.filter((a) => getConfidenceMeta(a.explicacion).label === "Alta").length;
-    const xgb = mlAlerts.filter((a) => a.explicacion?.modelo === "xgboost").length;
-    const lin = mlAlerts.filter((a) => a.explicacion?.modelo === "linear" || a.explicacion?.modelo === "lineal").length;
+    const total = filteredAlerts.length;
+    const alta = filteredAlerts.filter((a) => getConfidenceMeta(a.explicacion).label === "Alta").length;
+    const xgb = filteredAlerts.filter((a) => a.explicacion?.modelo === "xgboost").length;
+    const lin = filteredAlerts.filter((a) => a.explicacion?.modelo === "linear" || a.explicacion?.modelo === "lineal").length;
     return { total, alta, xgb, lin };
-  }, [mlAlerts]);
+  }, [filteredAlerts]);
 
   const rows = useMemo(
     () =>
-      mlAlerts.map((a) => {
+      filteredAlerts.map((a) => {
         const exp = a.explicacion || {};
         const cant = parseSuggestedUnits(a.mensaje);
         const topFactor = exp.top?.[0]?.factor;
@@ -366,6 +383,35 @@ export default function AdminMLPanel() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                background: "#fff",
+                padding: "8px 14px",
+                borderRadius: 12,
+                border: "1px solid #e2e8f0",
+                width: "250px",
+              }}
+            >
+              <Search size={16} color="#94a3b8" />
+              <input
+                type="text"
+                placeholder="Buscar por nombre o codigo..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  border: "none",
+                  outline: "none",
+                  background: "transparent",
+                  width: "100%",
+                  fontSize: "0.85rem",
+                  color: "#1e293b",
+                }}
+              />
             </div>
 
             {selectedUser && (

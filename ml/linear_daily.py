@@ -157,12 +157,32 @@ def forecast_daily(
                 rmse=0,
                 r2=0,
                 mae=0,
-                wape=0,
+                wape=1.0,
                 modelo="insuficiente",
                 safety=0,
                 serie=[],
                 historico=historico,
                 top_factors=[{"factor": "insuficientes_datos", "impacto": 0}],
+            )
+
+        # Detectar actividad insuficiente: si menos del 5% de los días tuvo ventas
+        dias_con_ventas = int(np.sum(Y > 0))
+        ratio_actividad = dias_con_ventas / len(Y) if len(Y) > 0 else 0
+
+        if ratio_actividad < 0.05:
+            historico = [{"date": r["date"].isoformat(), "y_real": r["y"]} for r in rows[-30:]]
+            promedio_bajo = float(np.mean(Y))
+            return ForecastResult(
+                yhat_total=round(promedio_bajo * h, 2),
+                rmse=0,
+                r2=0,
+                mae=0,
+                wape=0.8,
+                modelo="actividad_insuficiente",
+                safety=0,
+                serie=[],
+                historico=historico,
+                top_factors=[{"factor": "sin_demanda_reciente", "impacto": 0}],
             )
 
         if np.var(Y) == 0:
@@ -171,9 +191,9 @@ def forecast_daily(
             return ForecastResult(
                 yhat_total=promedio * h,
                 rmse=0,
-                r2=1.0,
+                r2=1.0 if promedio > 0 else 0.0,
                 mae=0,
-                wape=0,
+                wape=0.0 if promedio > 0 else 0.5,
                 modelo="constante",
                 safety=0,
                 serie=[

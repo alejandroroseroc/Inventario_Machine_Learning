@@ -56,7 +56,8 @@ const asArray = (value) => {
 
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 
-const getConfidenceMeta = (exp = {}) => {
+const getConfidenceMeta = (expParam = {}) => {
+  const exp = expParam || {};
   // Modelos sin datos suficientes → gris, sin confianza
   if (exp.modelo === "insuficiente" || exp.modelo === "actividad_insuficiente" || exp.modelo === "error") {
     return {
@@ -390,9 +391,21 @@ export default function AlertsAndSuggestions() {
 
           <div className="spacer" />
 
-          <div className="controls row gap-2">
-            <label htmlFor="sel-estado">Estado:</label>
-            <select id="sel-estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", marginTop: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", padding: "6px 12px", borderRadius: 8, border: "1px solid #d1d5db", minWidth: 250 }}>
+              <Search size={16} color="#9ca3af" />
+              <input
+                type="text"
+                placeholder="Buscar por medicamento o codigo..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ border: "none", outline: "none", background: "transparent", width: "100%", fontSize: "0.9rem", color: "#1e293b" }}
+              />
+            </div>
+
+            <div className="controls row gap-2" style={{ marginTop: 0 }}>
+              <label htmlFor="sel-estado">Estado:</label>
+              <select id="sel-estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
               <option value="activa">Activas</option>
               <option value="resuelta">Resueltas</option>
             </select>
@@ -415,6 +428,7 @@ export default function AlertsAndSuggestions() {
                 Recalcular (con prediccion)
               </button>
             )}
+            </div>
           </div>
         </div>
 

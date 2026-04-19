@@ -38,7 +38,8 @@ const parseSuggestedUnits = (msg) => {
   return m ? Number(m[1]) : null;
 };
 
-function getConfidenceMeta(exp = {}) {
+function getConfidenceMeta(expParam = {}) {
+  const exp = expParam || {};
   // Modelos sin datos suficientes
   if (exp.modelo === "insuficiente" || exp.modelo === "actividad_insuficiente" || exp.modelo === "error") {
     return { score: 0, color: "#94a3b8", label: "Sin datos" };

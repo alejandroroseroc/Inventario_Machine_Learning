@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, CheckCircle2, Hash, XCircle } from "lucide-react";
+import { Calendar, CheckCircle2, Hash, XCircle, Search } from "lucide-react";
 import { AlertsService } from "../../api/alerts.service";
 import { listLotesPorVencer } from "../lotes/repository";
 import RevisarLoteModal from "./RevisarLoteModal";
@@ -114,6 +114,7 @@ export default function AlertsAndSuggestions() {
   const [err, setErr] = useState("");
   const [expiring, setExpiring] = useState([]);
   const [mlAlerts, setMlAlerts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [loteRevisar, setLoteRevisar] = useState(null);
 
   const cargar = async () => {

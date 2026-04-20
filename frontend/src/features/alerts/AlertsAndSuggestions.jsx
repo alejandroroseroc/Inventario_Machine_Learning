@@ -391,43 +391,59 @@ export default function AlertsAndSuggestions() {
 
           <div className="spacer" />
 
-          <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", marginTop: "16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", padding: "6px 12px", borderRadius: 8, border: "1px solid #d1d5db", minWidth: 250 }}>
-              <Search size={16} color="#9ca3af" />
+          <div className="alerts-toolbar">
+            <div className="alerts-search-group">
+              <Search size={16} className="alerts-search-icon" />
               <input
                 type="text"
-                placeholder="Buscar por medicamento o codigo..."
+                className="alerts-search-input"
+                placeholder="Buscar por medicamento o codigo de barras..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ border: "none", outline: "none", background: "transparent", width: "100%", fontSize: "0.9rem", color: "#1e293b" }}
+                aria-label="Buscar por medicamento o codigo de barras"
               />
+              {searchTerm ? (
+                <button
+                  type="button"
+                  className="alerts-search-clear"
+                  onClick={() => setSearchTerm("")}
+                  aria-label="Limpiar busqueda"
+                >
+                  <XCircle size={16} />
+                </button>
+              ) : null}
             </div>
 
-            <div className="controls row gap-2" style={{ marginTop: 0 }}>
-              <label htmlFor="sel-estado">Estado:</label>
-              <select id="sel-estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
-              <option value="activa">Activas</option>
-              <option value="resuelta">Resueltas</option>
-            </select>
+            <div className="alerts-filters controls row gap-2">
+              <label htmlFor="sel-estado" className="alerts-filter-label">Estado</label>
+              <select
+                id="sel-estado"
+                className="alerts-filter-control"
+                value={estado}
+                onChange={(e) => setEstado(e.target.value)}
+              >
+                <option value="activa">Activas</option>
+                <option value="resuelta">Resueltas</option>
+              </select>
 
-            {tab === "caducan" ? (
-              <>
-                <label htmlFor="dias-input">Dias:</label>
-                <input
-                  id="dias-input"
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={diasVenc}
-                  onChange={(e) => setDiasVenc(Number(e.target.value || 60))}
-                  style={{ width: 72 }}
-                />
-              </>
-            ) : (
-              <button type="button" className="btn primary" onClick={onRecalcPredict}>
-                Recalcular (con prediccion)
-              </button>
-            )}
+              {tab === "caducan" ? (
+                <>
+                  <label htmlFor="dias-input" className="alerts-filter-label">Dias</label>
+                  <input
+                    id="dias-input"
+                    type="number"
+                    min={1}
+                    max={365}
+                    className="alerts-filter-control alerts-filter-control--sm"
+                    value={diasVenc}
+                    onChange={(e) => setDiasVenc(Number(e.target.value || 60))}
+                  />
+                </>
+              ) : (
+                <button type="button" className="btn primary alerts-recalc-btn" onClick={onRecalcPredict}>
+                  Recalcular (con prediccion)
+                </button>
+              )}
             </div>
           </div>
         </div>

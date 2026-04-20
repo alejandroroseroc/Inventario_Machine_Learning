@@ -17,7 +17,7 @@ if str(REPO_ROOT) not in sys.path:
 # ─── Seguridad
 SECRET_KEY = os.environ.get(
     "SECRET_KEY",
-    "django-insecure-y(jl-f8_=2lv@g6_v&0e!40byq$_7(_mliga*t^f2d32ae7^+j",
+    "dev-insecure-secret-key-change-me",
 )
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
@@ -93,7 +93,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("DB_NAME", os.environ.get("POSTGRES_DB", "inventario_db")),
         "USER": os.environ.get("DB_USER", os.environ.get("POSTGRES_USER", "postgres")),
-        "PASSWORD": os.environ.get("DB_PASSWORD", os.environ.get("POSTGRES_PASSWORD", "2018")),
+        "PASSWORD": os.environ.get("DB_PASSWORD", os.environ.get("POSTGRES_PASSWORD", "postgres")),
         "HOST": os.environ.get("DB_HOST", os.environ.get("POSTGRES_HOST", "localhost")),
         "PORT": os.environ.get("DB_PORT", os.environ.get("POSTGRES_PORT", "5432")),
         "OPTIONS": (
@@ -145,22 +145,29 @@ CORS_ALLOW_HEADERS = [
 
 _cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "").strip()
 _cors_regexes = os.environ.get("CORS_ALLOWED_ORIGIN_REGEXES", "").strip()
-
-CORS_ALLOW_ALL_ORIGINS = _cors_origins == "*"
-CORS_ALLOWED_ORIGINS = [] if CORS_ALLOW_ALL_ORIGINS else [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+_default_prod_origins = [
     "https://inventario-machine-learning-ecru.vercel.app",
-] + [
+]
+
+CORS_ALLOW_ALL_ORIGINS = DEBUG and _cors_origins == "*"
+CORS_ALLOWED_ORIGINS = (
+    [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ] if DEBUG else _default_prod_origins
+) + [
     o.strip()
     for o in _cors_origins.split(",")
     if o.strip() and o.strip() != "*"
 ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.vercel\.app$",
-] + [
     pattern.strip()
     for pattern in _cors_regexes.split(",")
     if pattern.strip()
 ]
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True

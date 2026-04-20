@@ -84,7 +84,7 @@ export default function Navbar() {
 
         setExpiringItems(expiring);
         setCriticalItems(critical);
-      } catch (_) {
+      } catch {
         if (!cancelled) {
           setExpiringItems([]);
           setCriticalItems([]);

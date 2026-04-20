@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { http } from "../api/http";
 
 const Ctx = createContext(null);
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(Ctx);
 
 /** Verifica si un JWT ha expirado (con 30s de margen) */
@@ -78,7 +79,9 @@ export function AuthProvider({ children }) {
       localStorage.removeItem("refresh");
       localStorage.removeItem("token");
       localStorage.removeItem("is_admin");
-    } catch {}
+    } catch {
+      // Ignore storage cleanup errors to ensure logout always completes.
+    }
     setIsAuth(false);
     setIsAdmin(false);
   }

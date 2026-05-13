@@ -23,6 +23,10 @@ export async function crearVentaUnit({ producto, cantidad, precio_unitario, lote
   return http.post(`/inventory/ventas`, { body, auth: true });
 }
 
+export async function crearVenta(items) {
+  return http.post(`/inventory/ventas`, { body: { items }, auth: true });
+}
+
 // Ventas del día (sin parámetro = hoy)
 export async function listarVentasHoy() {
   return http.get(`/inventory/ventas`, { auth: true });
@@ -35,8 +39,8 @@ export async function getCierreDia(fechaIso) {
 }
 
 // Anular venta (devuelve stock)
-export async function anularVenta(id) {
-  return http.del(`/inventory/ventas/${id}`, { auth: true });
+export async function anularVenta(id, motivo = "") {
+  return http.del(`/inventory/ventas/${id}`, { body: { motivo }, auth: true });
 }
 
 // Historial mensual de ventas

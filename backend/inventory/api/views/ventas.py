@@ -57,7 +57,11 @@ class VentaDetailView(generics.RetrieveDestroyAPIView):
 
     def delete(self, request, *args, **kwargs):
         try:
-            venta = anular_venta(kwargs["pk"], user=request.user)
+            venta = anular_venta(
+                kwargs["pk"],
+                user=request.user,
+                motivo=request.data.get("motivo", ""),
+            )
             return Response(VentaSerializer(venta).data, status=200)
         except (ValidationError, ValueError) as e:
             msg = getattr(e, "message", None) or str(e)

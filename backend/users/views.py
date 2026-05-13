@@ -55,9 +55,33 @@ class UserDeleteView(APIView):
     permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
     def delete(self, request, pk):
         from django.contrib.auth.models import User
+        from django.db import transaction
+        from django.db.models import Q
+        from django.db.models.deletion import ProtectedError
+        from inventory.models import Movimiento, Producto, Venta
+
         try:
             user = User.objects.get(id=pk, is_staff=False)
-            user.delete()
+            with transaction.atomic():
+                productos = Producto.objects.filter(usuario=user)
+
+                # Las ventas e items usan referencias protegidas a productos/lotes.
+                # Se eliminan antes para liberar el inventario del usuario.
+                Venta.objects.filter(
+                    Q(usuario=user) | Q(items__producto__usuario=user)
+                ).distinct().delete()
+
+                Movimiento.objects.filter(
+                    Q(usuario=user) | Q(producto__usuario=user) | Q(lote__producto__usuario=user)
+                ).delete()
+
+                productos.delete()
+                user.delete()
             return Response({"message": "Usuario eliminado correctamente"}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        except ProtectedError:
+            return Response(
+                {"detail": "No se pudo eliminar porque el usuario tiene datos relacionados protegidos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

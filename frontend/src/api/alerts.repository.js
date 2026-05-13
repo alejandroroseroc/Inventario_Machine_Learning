@@ -25,8 +25,8 @@ const AlertsRepository = {
   },
 
   // Resolver una alerta
-  resolve: (id) =>
-    http.patch(`/inventory/alertas/${id}/resolver`, { auth: true }),
+  resolve: (id, decision = "revisada") =>
+    http.patch(`/inventory/alertas/${id}/resolver`, { body: { decision }, auth: true }),
 
   // (Opcionales) — solo si implementas en backend
   listByReason: ({ reason, estado = "activa" }) => {

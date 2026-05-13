@@ -163,6 +163,18 @@ export default function AdminMLPanel() {
   const [selectedUser, setSelectedUser] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [pharmacists, setPharmacists] = useState([]);
+  const [notice, setNotice] = useState(null);
+  const [deleteCandidate, setDeleteCandidate] = useState(null);
+
+  const showNotice = (type, title, message = "") => {
+    setNotice({ type, title, message });
+  };
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(null), 4200);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -202,32 +214,41 @@ export default function AdminMLPanel() {
     try {
       await AlertsService.recalcPredict(14, selectedUser || null);
       await cargar();
-      alert("Sugerencias recalculadas correctamente.");
+      showNotice("success", "Predicciones recalculadas", "Las sugerencias se actualizaron correctamente.");
     } catch (e) {
-      alert(e?.response?.data?.detail || "Error al recalcular.");
+      showNotice("error", "Error al recalcular", e?.response?.data?.detail || "Intentalo nuevamente.");
     } finally {
       setLoading(false);
     }
   };
 
   const onDeleteUser = async () => {
-    if (!selectedUser) return;
-    const userObj = pharmacists.find((u) => String(u.id) === String(selectedUser));
-    const confirmPopup = window.confirm(
+    if (deleteCandidate?.id) {
+      // Continua con la eliminacion confirmada en el modal.
+    } else {
+      if (!selectedUser) return;
+      const userObj = pharmacists.find((u) => String(u.id) === String(selectedUser));
+      setDeleteCandidate(userObj || { id: selectedUser, username: "Usuario seleccionado" });
+      return;
+    }
+    /*
+    
       `¿Estas seguro de que deseas eliminar al usuario "${userObj?.username || userObj?.email}"? Esta accion no se puede deshacer.`,
     );
     if (!confirmPopup) return;
+    */
 
     setLoading(true);
     try {
       const { http } = await import("../../../api/http");
-      await http.del(`/auth/users/${selectedUser}`, { auth: true });
-      alert("Usuario eliminado correctamente.");
+      await http.del(`/auth/users/${deleteCandidate.id}`, { auth: true });
+      showNotice("success", "Usuario eliminado", `${deleteCandidate.username || deleteCandidate.email || "El usuario"} fue eliminado correctamente.`);
       setSelectedUser("");
+      setDeleteCandidate(null);
       const resp = await http.get("/auth/users", { auth: true });
       setPharmacists(Array.isArray(resp) ? resp : []);
     } catch (e) {
-      alert(e?.response?.data?.detail || "Error al eliminar usuario.");
+      showNotice("error", "Error al eliminar usuario", e?.payload?.detail || e?.response?.data?.detail || e?.message || "Intentalo nuevamente.");
     } finally {
       setLoading(false);
     }
@@ -310,6 +331,14 @@ export default function AdminMLPanel() {
 
   return (
     <section style={{ minHeight: "100vh", background: "#f8fafc", padding: "40px 32px" }}>
+      {notice && (
+        <div className={`admin-toast admin-toast--${notice.type}`} role="status" aria-live="polite">
+          <strong>{notice.title}</strong>
+          {notice.message ? <span>{notice.message}</span> : null}
+          <button type="button" aria-label="Cerrar mensaje" onClick={() => setNotice(null)}>x</button>
+        </div>
+      )}
+
       <div style={{ maxWidth: 1250, margin: "0 auto" }}>
         <div
           style={{
@@ -377,7 +406,7 @@ export default function AdminMLPanel() {
                   cursor: "pointer",
                 }}
               >
-                <option value="">(Mio / Todos)</option>
+                <option value="">Todos los farmaceuticos</option>
                 {pharmacists.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.username || u.email}
@@ -570,6 +599,33 @@ export default function AdminMLPanel() {
         )}
       </div>
 
+      {deleteCandidate && (
+        <div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="delete-user-title">
+          <div className="admin-modal__box">
+            <div className="admin-modal__header">
+              <h2 id="delete-user-title">Eliminar usuario</h2>
+              <button type="button" className="admin-modal__close" onClick={() => setDeleteCandidate(null)}>
+                x
+              </button>
+            </div>
+            <div className="admin-modal__body">
+              <p>
+                Estas seguro de que deseas eliminar a <strong>{deleteCandidate.username || deleteCandidate.email}</strong>?
+              </p>
+              <p className="admin-modal__warning">Esta accion no se puede deshacer.</p>
+            </div>
+            <div className="admin-modal__footer">
+              <button type="button" className="admin-btn" onClick={() => setDeleteCandidate(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="admin-btn admin-btn--danger" onClick={onDeleteUser}>
+                Eliminar usuario
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
@@ -592,6 +648,108 @@ export default function AdminMLPanel() {
         .btn-danger-light:hover {
           background: #ffe4e6 !important;
           transform: translateY(-1px);
+        }
+        .admin-toast {
+          position: fixed;
+          top: 88px;
+          right: 24px;
+          z-index: 1100;
+          width: min(360px, calc(100vw - 32px));
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 4px 12px;
+          padding: 14px 16px;
+          border-radius: 12px;
+          border: 1px solid #cbd5e1;
+          background: #fff;
+          box-shadow: 0 18px 44px rgba(15, 23, 42, .18);
+        }
+        .admin-toast strong { color: #0f172a; }
+        .admin-toast span { grid-column: 1; color: #475569; font-size: 14px; }
+        .admin-toast button {
+          grid-column: 2;
+          grid-row: 1 / span 2;
+          border: 0;
+          background: transparent;
+          color: #64748b;
+          cursor: pointer;
+          font-weight: 700;
+        }
+        .admin-toast--success { border-left: 5px solid #16a34a; }
+        .admin-toast--error { border-left: 5px solid #dc2626; }
+        .admin-modal {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: rgba(15, 23, 42, .48);
+        }
+        .admin-modal__box {
+          width: min(460px, 100%);
+          background: #fff;
+          border-radius: 14px;
+          border: 1px solid #e2e8f0;
+          box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+          overflow: hidden;
+        }
+        .admin-modal__header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 18px 20px 14px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .admin-modal__header h2 {
+          margin: 0;
+          color: #0f172a;
+          font-size: 1.15rem;
+        }
+        .admin-modal__close {
+          width: 32px;
+          height: 32px;
+          border: 0;
+          border-radius: 8px;
+          background: #f1f5f9;
+          color: #475569;
+          cursor: pointer;
+          font-weight: 700;
+        }
+        .admin-modal__body {
+          padding: 18px 20px;
+          color: #334155;
+        }
+        .admin-modal__body p { margin: 0; }
+        .admin-modal__warning {
+          margin-top: 10px !important;
+          color: #b91c1c;
+          font-weight: 700;
+          font-size: .9rem;
+        }
+        .admin-modal__footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          padding: 14px 20px 18px;
+          border-top: 1px solid #e5e7eb;
+          background: #f8fafc;
+        }
+        .admin-btn {
+          padding: 10px 14px;
+          border-radius: 10px;
+          border: 1px solid #cbd5e1;
+          background: #f1f5f9;
+          color: #0f172a;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .admin-btn--danger {
+          background: #b91c1c;
+          border-color: #991b1b;
+          color: #fff;
         }
       `}</style>
     </section>

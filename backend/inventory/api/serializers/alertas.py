@@ -13,6 +13,6 @@ class AlertaSerializer(serializers.ModelSerializer):
         fields = (
             "id", "tipo", "estado", "criticidad", "mensaje",
             "producto", "producto_codigo", "producto_nombre", "producto_codigo_barras",
-            "lote", "created_at", "resolved_at",
+            "lote", "created_at", "resolved_at", "decision",
             "explicacion",
         )

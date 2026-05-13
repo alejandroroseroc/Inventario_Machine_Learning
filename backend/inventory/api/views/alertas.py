@@ -144,6 +144,10 @@ class AlertaResolverView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, pk: int):
+        decision = request.data.get("decision", "revisada")
+        if decision not in ("aprobada", "rechazada", "revisada"):
+            return Response({"detail": "Decision invalida."}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             al = Alerta.objects.get(
                 id=pk, tipo="stock", estado="activa",
@@ -153,5 +157,6 @@ class AlertaResolverView(APIView):
             return Response({"detail": "No encontrada o ya resuelta."}, status=404)
         al.estado = "resuelta"
         al.resolved_at = timezone.now()
-        al.save(update_fields=["estado", "resolved_at"])
+        al.decision = decision
+        al.save(update_fields=["estado", "resolved_at", "decision"])
         return Response(AlertaSerializer(al).data)

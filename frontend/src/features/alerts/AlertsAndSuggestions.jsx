@@ -149,9 +149,9 @@ export default function AlertsAndSuggestions() {
     cargar();
   }, [estado, diasVenc]);
 
-  const onResolve = async (id) => {
+  const onResolve = async (id, decision = "revisada") => {
     try {
-      await AlertsService.resolve(id);
+      await AlertsService.resolve(id, decision);
       await cargar();
     } catch (error) {
       alert(error?.response?.data?.detail || "No fue posible actualizar la alerta.");
@@ -222,6 +222,25 @@ export default function AlertsAndSuggestions() {
     });
   }, [mlAlerts, searchTerm]);
 
+  const formatResolvedAt = (value) => {
+    if (!value) return "";
+    try {
+      return new Intl.DateTimeFormat("es-CO", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(new Date(value));
+    } catch {
+      return "";
+    }
+  };
+
+  const decisionMeta = (decision) => {
+    if (decision === "aprobada") return { label: "Aprobada", className: "status-pill status-pill--approved" };
+    if (decision === "rechazada") return { label: "Rechazada", className: "status-pill status-pill--rejected" };
+    return { label: "Revisada", className: "status-pill status-pill--reviewed" };
+  };
+
   const rowsReorden = useMemo(
     () =>
       filteredMlAlerts.map((alerta) => {
@@ -232,6 +251,8 @@ export default function AlertsAndSuggestions() {
         const idDisplay = barcode || alerta.productoCodigo || "Sin ID";
         const r2 = Number.isFinite(explicacion.r2) ? Math.max(0, Math.round(explicacion.r2 * 100)) : null;
         const wape = Number.isFinite(explicacion.wape) ? Math.round(explicacion.wape * 100) : null;
+
+        const decision = decisionMeta(alerta.decision);
 
         return (
           <tr key={alerta.id}>
@@ -329,35 +350,44 @@ export default function AlertsAndSuggestions() {
             </td>
 
             <td>
-              <span className="tag tag-blue">Sugerencia ML</span>
+              {alerta.estado === "resuelta" ? (
+                <div className="resolved-state">
+                  <span className={decision.className}>{decision.label}</span>
+                  {alerta.resueltoEn ? (
+                    <span className="resolved-date">{formatResolvedAt(alerta.resueltoEn)}</span>
+                  ) : null}
+                </div>
+              ) : (
+                <span className="tag tag-blue">Sugerencia ML</span>
+              )}
             </td>
 
-            <td className="text-right" style={{ verticalAlign: "middle" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
-                <button
-                  type="button"
-                  className="btn primary"
-                  onClick={() => onResolve(alerta.id)}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "115px", justifyContent: "flex-start" }}
-                >
-                  <CheckCircle2 size={16} />
-                  Aprobar
-                </button>
-                <button
-                  type="button"
-                  className="btn danger"
-                  onClick={() => onResolve(alerta.id)}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "115px", justifyContent: "flex-start" }}
-                >
-                  <XCircle size={16} />
-                  Rechazar
-                </button>
-              </div>
-            </td>
+            {estado === "activa" ? (
+              <td className="text-right" style={{ verticalAlign: "middle" }}>
+                <div className="suggestion-actions">
+                  <button
+                    type="button"
+                    className="btn primary suggestion-action"
+                    onClick={() => onResolve(alerta.id, "aprobada")}
+                  >
+                    <CheckCircle2 size={16} />
+                    Aprobar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn danger suggestion-action"
+                    onClick={() => onResolve(alerta.id, "rechazada")}
+                  >
+                    <XCircle size={16} />
+                    Rechazar
+                  </button>
+                </div>
+              </td>
+            ) : null}
           </tr>
         );
       }),
-    [filteredMlAlerts],
+    [estado, filteredMlAlerts],
   );
 
   return (
@@ -497,7 +527,9 @@ export default function AlertsAndSuggestions() {
                     <th scope="col">CANTIDAD SUGERIDA</th>
                     <th scope="col">CONFIANZA</th>
                     <th scope="col">ESTADO</th>
-                    <th scope="col" className="text-right">ACCIONES</th>
+                    {estado === "activa" ? (
+                      <th scope="col" className="text-right">ACCIONES</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -505,7 +537,7 @@ export default function AlertsAndSuggestions() {
                     rowsReorden
                   ) : (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: "center", padding: 20 }}>
+                      <td colSpan={estado === "activa" ? 5 : 4} style={{ textAlign: "center", padding: 20 }}>
                         <em>No hay sugerencias generadas que coincidan con la busqueda. Haz clic en "Recalcular" para generarlas.</em>
                       </td>
                     </tr>

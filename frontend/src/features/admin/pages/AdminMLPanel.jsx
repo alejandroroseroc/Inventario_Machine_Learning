@@ -38,6 +38,19 @@ const parseSuggestedUnits = (msg) => {
   return m ? Number(m[1]) : null;
 };
 
+const isMlSuggestion = (alerta) => {
+  const exp = alerta?.explicacion;
+  return Boolean(
+    exp
+    && exp.modelo
+    && (
+      Array.isArray(exp.top)
+      || Number.isFinite(exp.r2)
+      || Number.isFinite(exp.wape)
+    )
+  );
+};
+
 function getConfidenceMeta(expParam = {}) {
   const exp = expParam || {};
   // Modelos sin datos suficientes
@@ -197,7 +210,7 @@ export default function AdminMLPanel() {
         estado,
         usuario_id: selectedUser || null,
       });
-      setMlAlerts(asArray(alerts));
+      setMlAlerts(asArray(alerts).filter(isMlSuggestion));
     } catch (e) {
       setErr(e?.response?.data?.detail || "No se pudieron cargar los datos.");
     } finally {

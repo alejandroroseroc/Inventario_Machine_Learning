@@ -4,33 +4,6 @@ import { AlertsService } from "../../api/alerts.service";
 import { listLotesPorVencer } from "../lotes/repository";
 import RevisarLoteModal from "./RevisarLoteModal";
 
-const factorLabel = (factor) => {
-  if (factor === "ma7") return "Tendencia (MA7)";
-  if (factor === "lag1") return "Ultimo dia";
-  if (factor === "lag7") return "Hace 1 semana";
-  if (factor === "es_quincena") return "Efecto quincena";
-  if (factor === "es_fin_mes") return "Fin de mes";
-  if (typeof factor === "string" && factor.startsWith("dow_")) {
-    const index = parseInt(factor.split("_")[1], 10);
-    const map = { 1: "Lun", 2: "Mar", 3: "Mie", 4: "Jue", 5: "Vie", 6: "Sab" };
-    return map[index] || factor;
-  }
-  return factor || "Tendencia";
-};
-
-const reasonText = (alerta) => {
-  const top = alerta?.explicacion?.top || [];
-  if (!top.length) return "Estimacion de demanda historica";
-
-  const first = top[0]?.factor;
-  if (first === "ma7") return "La tendencia reciente sostiene la sugerencia";
-  if (first === "lag1" || first === "lag7") return "El comportamiento reciente del producto sigue estable";
-  if (typeof first === "string" && first.startsWith("dow_")) {
-    return `La demanda suele subir los ${factorLabel(first)}`;
-  }
-  return `Factor principal: ${factorLabel(first)}`;
-};
-
 const parseSuggestedUnits = (mensaje) => {
   if (!mensaje) return null;
   const match = String(mensaje).match(/Sugerido\s+(\d+)\s*ud/i);
@@ -71,8 +44,6 @@ const getConfidenceMeta = (expParam = {}) => {
 
   const r2 = Number.isFinite(exp?.r2) ? exp.r2 : null;
   const wape = Number.isFinite(exp?.wape) ? exp.wape : null;
-  const mae = Number.isFinite(exp?.mae) ? exp.mae : null;
-
   const r2Score = r2 == null ? 0 : clamp01(r2);
   const wapeScore = wape == null ? r2Score : clamp01(1 - wape);
   const score = Math.round(((r2Score * 0.35) + (wapeScore * 0.65)) * 100);
@@ -83,7 +54,7 @@ const getConfidenceMeta = (expParam = {}) => {
       label: "Alta confianza",
       color: "#27ae60",
       text: "La sugerencia es consistente con la demanda reciente y el error historico es bajo.",
-      detail: mae == null ? "Lista para aprobar" : `Error medio diario aprox.: ${mae.toFixed(2)} uds`,
+      detail: "Lista para aprobar",
     };
   }
 
@@ -93,7 +64,7 @@ const getConfidenceMeta = (expParam = {}) => {
       label: "Confianza moderada",
       color: "#f39c12",
       text: "La prediccion es util para decidir compra, aunque conviene revisar contexto comercial.",
-      detail: mae == null ? "Revisar antes de aprobar" : `Error medio diario aprox.: ${mae.toFixed(2)} uds`,
+      detail: "Revisar antes de aprobar",
     };
   }
 
@@ -102,7 +73,7 @@ const getConfidenceMeta = (expParam = {}) => {
     label: "Revision recomendada",
     color: "#e74c3c",
     text: "La demanda es mas inestable y se recomienda revisar el pedido antes de aprobarlo.",
-    detail: mae == null ? "Validar con el equipo" : `Error medio diario aprox.: ${mae.toFixed(2)} uds`,
+    detail: "Validar con el equipo",
   };
 };
 
@@ -117,6 +88,17 @@ export default function AlertsAndSuggestions() {
   const [mlAlerts, setMlAlerts] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loteRevisar, setLoteRevisar] = useState(null);
+  const [notice, setNotice] = useState(null);
+
+  const showNotice = (type, title, message = "") => {
+    setNotice({ type, title, message });
+  };
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(null), 4200);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const cargar = async () => {
     setLoading(true);
@@ -154,7 +136,7 @@ export default function AlertsAndSuggestions() {
       await AlertsService.resolve(id, decision);
       await cargar();
     } catch (error) {
-      alert(error?.response?.data?.detail || "No fue posible actualizar la alerta.");
+      showNotice("error", "No fue posible actualizar la alerta", error?.payload?.detail || error?.response?.data?.detail || "Intentalo nuevamente.");
     }
   };
 
@@ -162,9 +144,9 @@ export default function AlertsAndSuggestions() {
     try {
       await AlertsService.recalcPredict(14);
       await cargar();
-      alert("Sugerencias recalculadas con prediccion de 14 dias.");
+      showNotice("success", "Sugerencias recalculadas", "Prediccion actualizada para los proximos 14 dias.");
     } catch (error) {
-      alert(error?.response?.data?.detail || "No fue posible recalcular con prediccion.");
+      showNotice("error", "No fue posible recalcular", error?.payload?.detail || error?.response?.data?.detail || "Intentalo nuevamente.");
     }
   };
 
@@ -249,9 +231,6 @@ export default function AlertsAndSuggestions() {
         const meta = getConfidenceMeta(explicacion);
         const barcode = alerta.productoCodigoBarras;
         const idDisplay = barcode || alerta.productoCodigo || "Sin ID";
-        const r2 = Number.isFinite(explicacion.r2) ? Math.max(0, Math.round(explicacion.r2 * 100)) : null;
-        const wape = Number.isFinite(explicacion.wape) ? Math.round(explicacion.wape * 100) : null;
-
         const decision = decisionMeta(alerta.decision);
 
         return (
@@ -335,12 +314,6 @@ export default function AlertsAndSuggestions() {
                   <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>
                     {meta.detail}
                   </div>
-                  <div style={{ fontSize: "0.73rem", color: "#94a3b8", marginTop: 4 }}>
-                    R2: {r2 == null ? "-" : `${r2}%`} | WAPE: {wape == null ? "-" : `${wape}%`}
-                  </div>
-                  <div style={{ fontSize: "0.73rem", color: "#94a3b8", marginTop: 2 }}>
-                    {reasonText(alerta)}
-                  </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.75rem", color: "#888", marginTop: 4 }}>
                     <Calendar size={12} strokeWidth={2.5} color="#64748b" />
                     Para los proximos {explicacion.h || 14} dias
@@ -392,6 +365,14 @@ export default function AlertsAndSuggestions() {
 
   return (
     <section className="alerts-scope alerts-wrapper" aria-labelledby="alerts-title">
+      {notice && (
+        <div className={`alerts-toast alerts-toast--${notice.type}`} role="status" aria-live="polite">
+          <strong>{notice.title}</strong>
+          {notice.message ? <span>{notice.message}</span> : null}
+          <button type="button" aria-label="Cerrar mensaje" onClick={() => setNotice(null)}>x</button>
+        </div>
+      )}
+
       <h1 id="alerts-title">Alertas y sugerencias</h1>
 
       <div className="card" style={{ paddingTop: 0 }}>

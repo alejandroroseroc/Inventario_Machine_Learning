@@ -3,7 +3,7 @@ import {
   anularVenta,
   buscarLotePorNumero,
   buscarProductos,
-  crearVenta,
+  crearVentaUnit,
   getCierreDia,
   getHistorialPaginado,
   listarLotes,
@@ -32,6 +32,7 @@ export default function RegistrarVentaPage() {
   const [loteId, setLoteId] = useState(null);
   const [cantidad, setCantidad] = useState(1);
   const [precio, setPrecio] = useState(0);
+  const [registrando, setRegistrando] = useState(false);
 
   // ------- LISTA DEL DÍA -------
   const [ventas, setVentas] = useState([]);
@@ -47,7 +48,6 @@ export default function RegistrarVentaPage() {
   const [notice, setNotice] = useState(null);
   const [confirmAnularId, setConfirmAnularId] = useState(null);
   const [cierreResumen, setCierreResumen] = useState(null);
-  const [carrito, setCarrito] = useState([]);
   const [motivoAnulacion, setMotivoAnulacion] = useState("");
 
   const showNotice = (type, title, message = "") => {
@@ -166,11 +166,6 @@ export default function RegistrarVentaPage() {
 
   const lotePreview = selectedLote || lotes[0] || null;
 
-  const totalCarrito = useMemo(
-    () => carrito.reduce((acc, item) => acc + Number(item.cantidad || 0) * Number(item.precio_unitario || 0), 0),
-    [carrito]
-  );
-
   const limpiarEditor = () => {
     setProductoSel(null);
     setLotes([]);
@@ -181,7 +176,8 @@ export default function RegistrarVentaPage() {
     setTimeout(() => scanRef.current?.focus(), 0);
   };
 
-  const agregarAlCarrito = () => {
+  const registrarVenta = async () => {
+    if (registrando) return;
     if (!productoSel?.id) { showNotice("warning", "Selecciona un producto"); return; }
     if (Number(precio) < 500) { showNotice("warning", "Precio invalido", "El precio debe ser al menos 500 COP."); return; }
     if (Number(cantidad) <= 0) { showNotice("warning", "Cantidad invalida", "La cantidad debe ser mayor que 0."); return; }
@@ -198,45 +194,22 @@ export default function RegistrarVentaPage() {
       }
     }
 
-    const item = {
-      lineId: `${productoSel.id}-${loteMode === "manual" ? loteId : "auto"}-${Date.now()}`,
-      producto: productoSel.id,
-      producto_nombre: productoSel.nombre,
-      cantidad: Number(cantidad),
-      precio_unitario: Number(precio || 0),
-      lote: loteMode === "manual" ? loteId : undefined,
-      lote_label: loteMode === "manual" && selectedLote
-        ? `#${selectedLote.numero_lote || selectedLote.id}`
-        : "Auto (FEFO)",
-      stock_lote: selectedLote?.stock_lote ?? null,
-      fecha_caducidad: selectedLote?.fecha_caducidad ?? lotePreview?.fecha_caducidad ?? null,
-    };
-
-    setCarrito((items) => [...items, item]);
-    limpiarEditor();
-    showNotice("success", "Producto agregado", `${item.producto_nombre} quedo en el carrito.`);
-  };
-
-  const registrarVenta = async () => {
-    if (!carrito.length) {
-      showNotice("warning", "Carrito vacio", "Agrega al menos un medicamento antes de registrar la venta.");
-      return;
-    }
-
+    setRegistrando(true);
     try {
-      const v = await crearVenta(carrito.map(({ producto, cantidad, precio_unitario, lote }) => ({
-        producto,
-        cantidad,
-        precio_unitario,
-        ...(lote ? { lote } : {}),
-      })));
+      const v = await crearVentaUnit({
+        producto: productoSel.id,
+        cantidad: Number(cantidad),
+        precio_unitario: Number(precio || 0),
+        lote: loteMode === "manual" ? loteId : undefined,
+      });
       await loadDia();
-      setCarrito([]);
       limpiarEditor();
       showNotice("success", `Venta #${v.id} registrada`, `Total $${money(v.total)}`);
     } catch (e) {
       console.error(e);
       showNotice("error", "No se pudo registrar la venta", e?.response?.data?.detail || "Intentalo nuevamente.");
+    } finally {
+      setRegistrando(false);
     }
   };
 
@@ -423,62 +396,13 @@ export default function RegistrarVentaPage() {
             </div>
             <div className="actions">
               <button className="btn" onClick={() => setProductoSel(null)}>Cancelar</button>
-              <button className="btn btn--primary" onClick={agregarAlCarrito}>Agregar al carrito</button>
+              <button className="btn btn--primary" onClick={registrarVenta} disabled={registrando}>
+                {registrando ? "Registrando..." : "Registrar"}
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      <div className="card cart-card">
-        <div className="cart-card__header">
-          <div>
-            <h2>Carrito de venta</h2>
-            <p className="muted tiny">Agrega varios medicamentos y registra una sola venta.</p>
-          </div>
-          <strong>${money(totalCarrito)}</strong>
-        </div>
-
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">MEDICAMENTO</th>
-                <th scope="col">LOTE</th>
-                <th scope="col" className="text-right">UNID</th>
-                <th scope="col" className="text-right">$ UNIDAD</th>
-                <th scope="col" className="text-right">TOTAL</th>
-                <th scope="col"><span className="sr-only">Acciones</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {carrito.length === 0 ? (
-                <tr><td className="muted" colSpan={6}>No hay productos en el carrito</td></tr>
-              ) : carrito.map((item) => (
-                <tr key={item.lineId}>
-                  <td>
-                    <div className="font-medium">{item.producto_nombre}</div>
-                    {item.fecha_caducidad ? <div className="tiny muted">Vence: {item.fecha_caducidad}</div> : null}
-                  </td>
-                  <td>{item.lote_label}</td>
-                  <td className="text-right">{item.cantidad}</td>
-                  <td className="text-right">${money(item.precio_unitario)}</td>
-                  <td className="text-right"><b>${money(item.cantidad * item.precio_unitario)}</b></td>
-                  <td className="text-right">
-                    <button className="link-danger" onClick={() => setCarrito((items) => items.filter((row) => row.lineId !== item.lineId))}>
-                      Quitar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="cart-card__footer">
-          <button className="btn" onClick={() => setCarrito([])} disabled={!carrito.length}>Vaciar</button>
-          <button className="btn btn--primary" onClick={registrarVenta} disabled={!carrito.length}>Registrar venta</button>
-        </div>
-      </div>
 
       {/* TABLA DEL DÍA */}
       <div className="card table-wrap">

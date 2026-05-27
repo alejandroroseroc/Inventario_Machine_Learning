@@ -112,6 +112,7 @@ export default function AlertsAndSuggestions() {
         cantidad: item.stock_lote || item.cantidad || 0,
         fechaCaducidad: item.fecha_caducidad,
         diasRestantes: item.days_left ?? daysLeft(item.fecha_caducidad),
+        precio_costo: Number(item.precio_costo || 0),
       }));
 
       const alerts = await AlertsService.list({ estado });

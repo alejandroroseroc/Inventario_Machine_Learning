@@ -106,6 +106,35 @@ export default function RevisarLoteModal({ lote, onClose, onDone }) {
                         </div>
                     )}
 
+                    {/* Pérdida estimada */}
+                    {lote.precio_costo > 0 && lote.cantidad > 0 && (
+                        <div style={{
+                            marginTop: 16, padding: "12px 16px",
+                            background: aptoDevolucion ? "#fffbeb" : "#fef2f2",
+                            borderRadius: 10,
+                            border: `1px solid ${aptoDevolucion ? "#fde68a" : "#fecaca"}`,
+                        }}>
+                            <div style={{ fontSize: "0.85rem", color: "#64748b", marginBottom: 4 }}>
+                                Pérdida estimada
+                            </div>
+                            <div style={{
+                                fontWeight: 700, fontSize: "1.1rem",
+                                color: aptoDevolucion ? "#d97706" : "#dc2626",
+                            }}>
+                                ${(
+                                    aptoDevolucion
+                                        ? lote.precio_costo * lote.cantidad * 0.5
+                                        : lote.precio_costo * lote.cantidad
+                                ).toLocaleString("es-CO")}
+                            </div>
+                            <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: 2 }}>
+                                {aptoDevolucion
+                                    ? `${lote.cantidad} uds × $${Number(lote.precio_costo).toLocaleString("es-CO")} × 50% devolución`
+                                    : `${lote.cantidad} uds × $${Number(lote.precio_costo).toLocaleString("es-CO")} × 100% baja`}
+                            </div>
+                        </div>
+                    )}
+
                     {error && <div className="modal-error">{error}</div>}
                 </div>
 

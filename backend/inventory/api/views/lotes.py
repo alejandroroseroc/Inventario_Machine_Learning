@@ -81,6 +81,7 @@ class LotesPorVencerView(APIView):
                 "fecha_caducidad": l.fecha_caducidad.isoformat(),
                 "days_left": (l.fecha_caducidad - hoy).days,
                 "stock_lote": l.stock_lote,
+                "precio_costo": float(l.producto.precio_costo or 0),
             })
 
         return Response({"count": len(items), "results": items}, status=status.HTTP_200_OK)

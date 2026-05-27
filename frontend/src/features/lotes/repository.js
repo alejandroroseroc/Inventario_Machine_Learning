@@ -23,3 +23,15 @@ export async function gestionarVencimiento(loteId) {
     auth: true,
   });
 }
+
+export async function marcarVencidosAuto() {
+  return http.post("/inventory/lotes/marcar-vencidos", { auth: true });
+}
+
+export async function listLotesVencidos() {
+  return http.get("/inventory/lotes/vencidos", { auth: true });
+}
+
+export async function listLotesDevoluciones() {
+  return http.get("/inventory/lotes/devoluciones", { auth: true });
+}

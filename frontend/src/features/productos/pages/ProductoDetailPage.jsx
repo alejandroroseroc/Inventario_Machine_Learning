@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import "../../../styles/productos.css";
@@ -30,7 +30,10 @@ export default function ProductoDetailPage() {
 
   const [form, setForm] = useState({
     codigo: "", nombre: "", categoria: "C", punto_reorden: 0, valor_unitario: 0,
+    precio_costo: 0, margen_ganancia: 0,
   });
+
+  const prevPrecioRef = useRef({ precio_costo: 0, margen_ganancia: 0 });
 
   const [entradaForm, setEntradaForm] = useState({ scan: "", fecha_caducidad: "", cantidad: 0 });
   const [movForm, setMovForm] = useState({ tipo: "salida", cantidad: 1, lote_id: "" });
@@ -44,6 +47,8 @@ export default function ProductoDetailPage() {
         setForm({
           codigo: p.codigo ?? "", nombre: p.nombre ?? "", categoria: p.categoria ?? "C",
           punto_reorden: p.punto_reorden ?? 0, valor_unitario: Number(p.valor_unitario ?? 0),
+          precio_costo: Number(p.precio_costo ?? 0),
+          margen_ganancia: Number(p.margen_ganancia ?? 0),
         });
 
         const [f, ls, pv] = await Promise.all([
@@ -74,11 +79,28 @@ export default function ProductoDetailPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    const numericFields = ["valor_unitario", "punto_reorden", "precio_costo", "margen_ganancia"];
     setForm((s) => ({
       ...s,
-      [name]: name === "valor_unitario" || name === "punto_reorden" ? Number(value) : value,
+      [name]: numericFields.includes(name) ? Number(value) : value,
     }));
   };
+
+  // Auto-calcular valor_unitario cuando cambian precio_costo o margen_ganancia
+  useEffect(() => {
+    const pc = Number(form.precio_costo || 0);
+    const mg = Number(form.margen_ganancia || 0);
+    const prevPc = prevPrecioRef.current.precio_costo;
+    const prevMg = prevPrecioRef.current.margen_ganancia;
+
+    if ((pc !== prevPc || mg !== prevMg) && pc > 0 && mg > 0) {
+      const venta = Math.round(pc * (1 + mg / 100) * 100) / 100;
+      setForm((s) => ({ ...s, valor_unitario: venta }));
+    }
+    prevPrecioRef.current = { precio_costo: pc, margen_ganancia: mg };
+  }, [form.precio_costo, form.margen_ganancia]);
+
+  const precioAutoCalculado = Number(form.precio_costo || 0) > 0 && Number(form.margen_ganancia || 0) > 0;
 
   const save = async () => {
     setSaving(true);
@@ -215,9 +237,33 @@ export default function ProductoDetailPage() {
             <label htmlFor="det_rop">Punto de reorden (ROP)</label>
             <input id="det_rop" name="punto_reorden" type="number" value={form.punto_reorden} onChange={handleChange} />
           </div>
+          <div className="col" style={{ gridColumn: "1 / -1" }}>
+            <small className="hint" style={{ display: "block", marginBottom: 6 }}>
+              Si ingresas costo y margen, el precio de venta se calcula automáticamente.
+            </small>
+          </div>
           <div className="col">
-            <label htmlFor="det_valor">Valor unitario</label>
-            <input id="det_valor" name="valor_unitario" type="number" value={form.valor_unitario} onChange={handleChange} />
+            <label htmlFor="det_costo">Precio Costo (COP)</label>
+            <input id="det_costo" name="precio_costo" type="number" step="0.01" min={0}
+              value={form.precio_costo} onChange={handleChange} />
+          </div>
+          <div className="col">
+            <label htmlFor="det_margen">Margen de Ganancia (%)</label>
+            <input id="det_margen" name="margen_ganancia" type="number" step="0.01" min={0}
+              placeholder="Ej: 15" value={form.margen_ganancia} onChange={handleChange} />
+          </div>
+          <div className="col">
+            <label htmlFor="det_valor">Precio Venta (COP)</label>
+            <input
+              id="det_valor" name="valor_unitario" type="number" step="0.01" min={0}
+              value={form.valor_unitario} onChange={handleChange}
+              readOnly={precioAutoCalculado}
+              disabled={precioAutoCalculado}
+              style={precioAutoCalculado ? { background: "#f1f5f9", cursor: "not-allowed" } : {}}
+            />
+            {precioAutoCalculado && (
+              <small className="hint">Calculado automáticamente. Limpia costo/margen para editar.</small>
+            )}
           </div>
         </div>
       </section>

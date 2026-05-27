@@ -8,7 +8,9 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from inventory.models import Venta
+from decimal import Decimal
+
+from inventory.models import Venta, VentaItem
 from inventory.api.serializers import VentaSerializer
 from inventory.services import crear_venta, anular_venta
 
@@ -82,11 +84,22 @@ class VentaCierreDiaView(APIView):
 
         qs = Venta.objects.filter(fecha=fecha, usuario=request.user).order_by("id")
         total_ventas = sum(v.total for v in qs if not v.anulada)
+
+        items_no_anulados = (
+            VentaItem.objects
+            .filter(venta__fecha=fecha, venta__usuario=request.user, venta__anulada=False)
+            .select_related("producto")
+        )
+        ganancia_dia = Decimal("0")
+        for item in items_no_anulados:
+            ganancia_dia += (item.precio_unitario - item.producto.precio_costo) * item.cantidad
+
         data = {
             "fecha": fecha.isoformat(),
             "ventas_registradas": qs.count(),
             "ventas_anuladas": sum(1 for v in qs if v.anulada),
             "total_dia": float(total_ventas),
+            "ganancia_dia": float(ganancia_dia),
             "items": VentaSerializer(qs, many=True).data
         }
         return Response(data, status=200)

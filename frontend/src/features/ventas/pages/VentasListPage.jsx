@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { anularVenta, cierreDelDia, listarVentas } from "../repository";
+import "../../../styles/ventas.css";
 
 const money = (n) => Number(n || 0).toLocaleString("es-CO");
 
@@ -7,6 +8,8 @@ export default function VentasListPage() {
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
   const [ventas, setVentas] = useState([]);
   const [cierre, setCierre] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [confirmAnularId, setConfirmAnularId] = useState(null);
 
   const load = async (f) => {
     const v = await listarVentas(f); setVentas(v || []);
@@ -14,8 +17,36 @@ export default function VentasListPage() {
   };
   useEffect(() => { load(fecha); }, [fecha]);
 
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(null), 4200);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  const confirmarAnulacion = async () => {
+    const ventaId = confirmAnularId;
+    if (!ventaId) return;
+    setConfirmAnularId(null);
+    try {
+      await anularVenta(ventaId);
+      await load(fecha);
+      setNotice({ type: "success", title: "Venta anulada", message: `La venta #${ventaId} fue anulada exitosamente.` });
+    } catch (e) {
+      const msg = e?.response?.data?.detail || e.message || "Intentalo nuevamente.";
+      setNotice({ type: "error", title: "No se pudo anular", message: msg });
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-4">
+      {notice && (
+        <div className={`sales-toast sales-toast--${notice.type}`} role="status" aria-live="polite">
+          <strong>{notice.title}</strong>
+          {notice.message ? <span>{notice.message}</span> : null}
+          <button type="button" aria-label="Cerrar mensaje" onClick={() => setNotice(null)}>x</button>
+        </div>
+      )}
+
       <h1 className="text-2xl font-semibold">Ventas del día</h1>
 
       <div className="actions">
@@ -66,16 +97,7 @@ export default function VentasListPage() {
                   {!v.anulada && (
                     <button
                       className="btn btn--danger"
-                      onClick={async () => {
-                        if (!confirm(`¿Anular venta #${v.id}?`)) return;
-                        try {
-                          await anularVenta(v.id);
-                          load(fecha);
-                        } catch (e) {
-                          const msg = e?.response?.data?.detail || e.message || JSON.stringify(e);
-                          alert(`No se pudo anular: ${msg}`);
-                        }
-                      }}
+                      onClick={() => setConfirmAnularId(v.id)}
                     >
                       Anular
                     </button>
@@ -86,6 +108,32 @@ export default function VentasListPage() {
           </tbody>
         </table>
       </div>
+
+      {confirmAnularId && (
+        <div className="sales-modal" role="dialog" aria-modal="true" aria-labelledby="anular-list-title">
+          <div className="sales-modal__box sales-modal__box--sm">
+            <div className="sales-modal__header">
+              <h2 id="anular-list-title">Anular venta</h2>
+              <button type="button" className="sales-modal__close" onClick={() => setConfirmAnularId(null)}>
+                x
+              </button>
+            </div>
+            <div className="sales-modal__body">
+              <p>
+                Esta accion marcara la venta <strong>#{confirmAnularId}</strong> como anulada.
+              </p>
+            </div>
+            <div className="sales-modal__footer">
+              <button type="button" className="btn" onClick={() => setConfirmAnularId(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn--danger" onClick={confirmarAnulacion}>
+                Anular venta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

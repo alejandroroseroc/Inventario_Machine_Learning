@@ -68,6 +68,11 @@ class Movimiento(models.Model):
 class Alerta(models.Model):
     TIPO = (("stock", "stock"), ("caducidad", "caducidad"))
     ESTADO = (("activa", "activa"), ("resuelta", "resuelta"))
+    DECISION = (
+        ("aprobada", "aprobada"),
+        ("rechazada", "rechazada"),
+        ("revisada", "revisada"),
+    )
 
     tipo = models.CharField(max_length=20, choices=TIPO)
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name="alertas")
@@ -77,6 +82,7 @@ class Alerta(models.Model):
     estado = models.CharField(max_length=10, choices=ESTADO, default="activa")
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
+    decision = models.CharField(max_length=10, choices=DECISION, null=True, blank=True)
     explicacion = models.JSONField(null=True, blank=True)  # para ML
 
     class Meta:
@@ -93,6 +99,7 @@ class Venta(models.Model):
     fecha = models.DateField(default=timezone.localdate)   # callable (ok)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     anulada = models.BooleanField(default=False)
+    motivo_anulacion = models.CharField(max_length=255, blank=True, default="")
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name="ventas"

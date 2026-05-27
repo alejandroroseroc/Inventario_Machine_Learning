@@ -92,7 +92,7 @@ def crear_venta(items, user=None):
 
 
 @transaction.atomic
-def anular_venta(venta_id, user=None):
+def anular_venta(venta_id, user=None, motivo=""):
     """
     Marca venta como anulada y repone stock con movimientos 'entrada'.
     """
@@ -113,5 +113,6 @@ def anular_venta(venta_id, user=None):
         )
 
     venta.anulada = True
-    venta.save(update_fields=["anulada"])
+    venta.motivo_anulacion = (motivo or "").strip()[:255]
+    venta.save(update_fields=["anulada", "motivo_anulacion"])
     return venta

@@ -32,6 +32,7 @@ export default function RegistrarVentaPage() {
   const [loteId, setLoteId] = useState(null);
   const [cantidad, setCantidad] = useState(1);
   const [precio, setPrecio] = useState(0);
+  const [registrando, setRegistrando] = useState(false);
 
   // ------- LISTA DEL DÍA -------
   const [ventas, setVentas] = useState([]);
@@ -44,6 +45,34 @@ export default function RegistrarVentaPage() {
   const [histFiltroMonth, setHistFiltroMonth] = useState("");
   const [histPage, setHistPage] = useState(1);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const historialRef = useRef(null);
+  const [notice, setNotice] = useState(null);
+  const [confirmAnularId, setConfirmAnularId] = useState(null);
+  const [cierreResumen, setCierreResumen] = useState(null);
+  const [motivoAnulacion, setMotivoAnulacion] = useState("");
+
+  const showNotice = (type, title, message = "") => {
+    setNotice({ type, title, message });
+  };
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(null), 4200);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  const formatFechaHistorica = (venta) => {
+    if (venta?.created_at) {
+      return new Date(venta.created_at).toLocaleString("es-CO");
+    }
+    if (venta?.fecha) {
+      const [year, month, day] = String(venta.fecha).split("-").map(Number);
+      if (year && month && day) {
+        return new Date(year, month - 1, day).toLocaleDateString("es-CO");
+      }
+    }
+    return "-";
+  };
 
   const doSuggest = debounce(async (txt) => {
     const q = (txt || "").trim();
@@ -132,19 +161,42 @@ export default function RegistrarVentaPage() {
     [cantidad, precio]
   );
 
+  const selectedLote = useMemo(
+    () => (loteMode === "manual" && loteId ? lotes.find((l) => l.id === loteId) : null),
+    [loteId, loteMode, lotes]
+  );
+
+  const lotePreview = selectedLote || lotes[0] || null;
+
+  const limpiarEditor = () => {
+    setProductoSel(null);
+    setLotes([]);
+    setLoteMode("auto");
+    setLoteId(null);
+    setCantidad(1);
+    setPrecio(0);
+    setTimeout(() => scanRef.current?.focus(), 0);
+  };
+
   const registrarVenta = async () => {
-    if (!productoSel?.id) { alert("Selecciona un producto."); return; }
-    if (Number(precio) < 500) { alert("El precio debe ser al menos 500 COP"); return; }
-    if (Number(cantidad) <= 0) { alert("Cantidad debe ser > 0"); return; }
+    if (registrando) return;
+    if (!productoSel?.id) { showNotice("warning", "Selecciona un producto"); return; }
+    if (Number(precio) < 500) { showNotice("warning", "Precio invalido", "El precio debe ser al menos 500 COP."); return; }
+    if (Number(cantidad) <= 0) { showNotice("warning", "Cantidad invalida", "La cantidad debe ser mayor que 0."); return; }
 
     if (loteMode === "manual" && loteId) {
       const l = lotes.find(x => x.id === loteId);
       if (l && Number(cantidad) > Number(l.stock_lote || 0)) {
-        alert(`Cantidad supera el stock del lote #${l.id} (stock ${l.stock_lote}). Usa 'Auto (FEFO)' o reduce la cantidad.`);
+        showNotice(
+          "warning",
+          "Stock insuficiente",
+          `El lote #${l.id} tiene stock ${l.stock_lote}. Usa Auto (FEFO) o reduce la cantidad.`
+        );
         return;
       }
     }
 
+    setRegistrando(true);
     try {
       const v = await crearVentaUnit({
         producto: productoSel.id,
@@ -153,29 +205,97 @@ export default function RegistrarVentaPage() {
         lote: loteMode === "manual" ? loteId : undefined,
       });
       await loadDia();
-      setProductoSel(null);
-      setLotes([]); setLoteMode("auto"); setLoteId(null);
-      setCantidad(1); setPrecio(0);
-      setTimeout(() => scanRef.current?.focus(), 0);
-      alert(`Venta #${v.id} registrada. Total $${money(v.total)}`);
+      limpiarEditor();
+      showNotice("success", `Venta #${v.id} registrada`, `Total $${money(v.total)}`);
     } catch (e) {
       console.error(e);
-      alert(e?.response?.data?.detail || "Error al registrar la venta");
+      showNotice("error", "No se pudo registrar la venta", e?.response?.data?.detail || "Intentalo nuevamente.");
+    } finally {
+      setRegistrando(false);
     }
   };
 
   const doAnular = async (ventaId) => {
-    if (!confirm(`¿Seguro que deseas anular esta venta #${ventaId}?`)) return;
+    setConfirmAnularId(ventaId);
+    setMotivoAnulacion("");
+  };
+
+  const confirmarAnulacion = async () => {
+    const ventaId = confirmAnularId;
+    if (!ventaId) return;
+    setConfirmAnularId(null);
     try {
-      await anularVenta(ventaId);
+      await anularVenta(ventaId, motivoAnulacion);
       await loadDia();
-      alert("Venta anulada exitosamente.");
+      showNotice("success", "Venta anulada", `La venta #${ventaId} fue anulada exitosamente.`);
+    } catch (e) {
+      showNotice("error", "No se pudo anular", e?.payload?.detail || e?.message || "Intentalo nuevamente.");
     }
-    catch (e) { alert(e?.payload?.detail || e?.message || "No se pudo anular la venta."); }
+  };
+
+  const handleCierreDelDia = async () => {
+    const c = await getCierreDia().catch(() => null);
+    if (!c) {
+      showNotice("error", "No se pudo obtener el cierre");
+      return;
+    }
+
+    let nextYear = String(new Date().getFullYear());
+    let nextMonth = "";
+
+    if (c.fecha) {
+      const [year, month] = String(c.fecha).split("-");
+      nextYear = year || nextYear;
+      nextMonth = month ? String(Number(month)) : "";
+      setHistFiltroYear(nextYear);
+      setHistFiltroMonth(nextMonth);
+      setHistPage(1);
+    }
+
+    setLoadingHistorial(true);
+    try {
+      const data = await getHistorialPaginado(nextYear, nextMonth, 1);
+      setHistorialPaginado(data);
+    } catch {
+      setHistorialPaginado(null);
+    } finally {
+      setLoadingHistorial(false);
+    }
+
+    const ventasCompletadas = (c.items || []).filter((venta) => !venta.anulada);
+    const productosVendidos = ventasCompletadas.reduce(
+      (acc, venta) => acc + (venta.items || []).reduce((sum, item) => sum + Number(item.cantidad || 0), 0),
+      0
+    );
+    const medicamentosUnicos = new Set(
+      ventasCompletadas.flatMap((venta) => (venta.items || []).map((item) => item.producto))
+    ).size;
+
+    setCierreResumen({
+      fecha: c.fecha,
+      hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+      ventas: c.ventas_registradas,
+      anuladas: c.ventas_anuladas,
+      total: c.total_dia,
+      productosVendidos,
+      medicamentosUnicos,
+    });
+
+    setTimeout(() => {
+      historialRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   return (
     <div className="page page--ventas">
+      {notice && (
+        <div className={`sales-toast sales-toast--${notice.type}`} role="status" aria-live="polite">
+          <strong>{notice.title}</strong>
+          {notice.message ? <span>{notice.message}</span> : null}
+          <button type="button" aria-label="Cerrar mensaje" onClick={() => setNotice(null)}>x</button>
+        </div>
+      )}
+
       <h1 className="page__title">Ventas</h1>
 
       {/* BUSCADOR */}
@@ -266,13 +386,21 @@ export default function RegistrarVentaPage() {
             </select>
           </label>
 
+          <div className="stock-preview">
+            <span>Stock disponible</span>
+            <strong>{lotePreview ? `${lotePreview.stock_lote} uds` : "Sin stock"}</strong>
+            <small>{lotePreview?.fecha_caducidad ? `Vence: ${lotePreview.fecha_caducidad}` : "Sin lote disponible"}</small>
+          </div>
+
           <div className="editor__footer">
             <div className="muted">
               Subtotal: <b>${money(subtotal)}</b>
             </div>
             <div className="actions">
               <button className="btn" onClick={() => setProductoSel(null)}>Cancelar</button>
-              <button className="btn btn--primary" onClick={registrarVenta}>Registrar</button>
+              <button className="btn btn--primary" onClick={registrarVenta} disabled={registrando}>
+                {registrando ? "Registrando..." : "Registrar"}
+              </button>
             </div>
           </div>
         </div>
@@ -295,18 +423,26 @@ export default function RegistrarVentaPage() {
             {ventas.length === 0 ? (
               <tr><td className="muted" colSpan={6}>Sin ventas hoy</td></tr>
             ) : ventas.map(v => {
-              const it = (v.items && v.items[0]) || {};
-              const total = Number(it.cantidad || 0) * Number(it.precio_unitario || 0);
+              const items = v.items || [];
               return (
                 <tr key={v.id}>
-                  <td>{it.cantidad ?? "-"}</td>
-                  <td>{it.lote_numero ? `#${it.lote_numero}` : (it.lote ? `#${it.lote}` : "FEFO")}</td>
+                  <td>{items.reduce((sum, it) => sum + Number(it.cantidad || 0), 0) || "-"}</td>
                   <td>
-                    <div className="font-medium">{it.producto_nombre || "-"}</div>
-                    {v.anulada && <div className="text-danger tiny">ANULADA</div>}
+                    {items.map((it) => (
+                      <div key={it.id}>{it.lote_numero ? `#${it.lote_numero}` : (it.lote ? `#${it.lote}` : "FEFO")}</div>
+                    ))}
                   </td>
-                  <td className="text-right">${money(it.precio_unitario)}</td>
-                  <td className="text-right"><b>${money(total)}</b></td>
+                  <td>
+                    {items.map((it) => (
+                      <div key={it.id} className="font-medium">{it.producto_nombre || "-"}</div>
+                    ))}
+                    {v.anulada && <div className="text-danger tiny">ANULADA</div>}
+                    {v.motivo_anulacion && <div className="tiny muted">Motivo: {v.motivo_anulacion}</div>}
+                  </td>
+                  <td className="text-right">
+                    {items.map((it) => <div key={it.id}>${money(it.precio_unitario)}</div>)}
+                  </td>
+                  <td className="text-right"><b>${money(v.total)}</b></td>
                   <td className="text-right">
                     {!v.anulada && (
                       <button className="link-danger" onClick={() => doAnular(v.id)}>Anular</button>
@@ -345,7 +481,7 @@ export default function RegistrarVentaPage() {
       </div>
 
       {/* DETALLE DE VENTAS HISTÓRICAS */}
-      <div className="card" style={{ marginTop: 24 }}>
+      <div className="card" style={{ marginTop: 24 }} ref={historialRef}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0 }}>Detalle de Ventas Históricas</h2>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -400,13 +536,20 @@ export default function RegistrarVentaPage() {
                 <tr><td colSpan={6} className="muted text-center" style={{ padding: '24px' }}>No hay ventas en este periodo</td></tr>
               ) : (
                 historialPaginado.results.map(v => {
-                  const it = (v.items && v.items[0]) || {};
+                  const items = v.items || [];
                   return (
                     <tr key={v.id} style={{ opacity: v.anulada ? 0.6 : 1 }}>
-                      <td className="mono">{v.fecha ? new Date(v.fecha).toLocaleString('es-CO') : "-"}</td>
-                      <td className="font-medium">{it.producto_nombre || "-"}</td>
-                      <td>{it.lote_numero ? `#${it.lote_numero}` : (it.lote ? `#${it.lote}` : "FEFO")}</td>
-                      <td className="text-right">{it.cantidad ?? "-"}</td>
+                      <td className="mono">{formatFechaHistorica(v)}</td>
+                      <td className="font-medium">
+                        {items.map((it) => <div key={it.id}>{it.producto_nombre || "-"}</div>)}
+                        {v.motivo_anulacion && <div className="tiny muted">Motivo: {v.motivo_anulacion}</div>}
+                      </td>
+                      <td>
+                        {items.map((it) => (
+                          <div key={it.id}>{it.lote_numero ? `#${it.lote_numero}` : (it.lote ? `#${it.lote}` : "FEFO")}</div>
+                        ))}
+                      </td>
+                      <td className="text-right">{items.reduce((sum, it) => sum + Number(it.cantidad || 0), 0) || "-"}</td>
                       <td className="text-right"><b>${money(v.total)}</b></td>
                       <td className="text-right">
                         {v.anulada ? (
@@ -448,6 +591,87 @@ export default function RegistrarVentaPage() {
           </div>
         )}
       </div>
+
+      {confirmAnularId && (
+        <div className="sales-modal" role="dialog" aria-modal="true" aria-labelledby="anular-title">
+          <div className="sales-modal__box sales-modal__box--sm">
+            <div className="sales-modal__header">
+              <h2 id="anular-title">Anular venta</h2>
+              <button type="button" className="sales-modal__close" onClick={() => setConfirmAnularId(null)}>
+                x
+              </button>
+            </div>
+            <div className="sales-modal__body">
+              <p>
+                Esta accion marcara la venta <strong>#{confirmAnularId}</strong> como anulada y actualizara el total del dia.
+              </p>
+              <label className="cancel-reason">
+                <span>Motivo opcional</span>
+                <textarea
+                  value={motivoAnulacion}
+                  onChange={(e) => setMotivoAnulacion(e.target.value)}
+                  placeholder="Ej: error en cantidad, cliente cambio el pedido..."
+                  rows={3}
+                />
+              </label>
+            </div>
+            <div className="sales-modal__footer">
+              <button type="button" className="btn" onClick={() => setConfirmAnularId(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn--danger" onClick={confirmarAnulacion}>
+                Anular venta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cierreResumen && (
+        <div className="sales-modal" role="dialog" aria-modal="true" aria-labelledby="cierre-title">
+          <div className="sales-modal__box">
+            <div className="sales-modal__header">
+              <h2 id="cierre-title">Cierre del dia</h2>
+              <button type="button" className="sales-modal__close" onClick={() => setCierreResumen(null)}>
+                x
+              </button>
+            </div>
+            <div className="sales-modal__body">
+              <div className="sales-summary">
+                <div>
+                  <span>Fecha y hora</span>
+                  <strong>{cierreResumen.fecha} - {cierreResumen.hora}</strong>
+                </div>
+                <div>
+                  <span>Ventas registradas</span>
+                  <strong>{cierreResumen.ventas}</strong>
+                </div>
+                <div>
+                  <span>Anuladas</span>
+                  <strong>{cierreResumen.anuladas}</strong>
+                </div>
+                <div>
+                  <span>Total del dia</span>
+                  <strong>${money(cierreResumen.total)}</strong>
+                </div>
+                <div>
+                  <span>Unidades vendidas</span>
+                  <strong>{cierreResumen.productosVendidos}</strong>
+                </div>
+                <div>
+                  <span>Medicamentos distintos</span>
+                  <strong>{cierreResumen.medicamentosUnicos}</strong>
+                </div>
+              </div>
+            </div>
+            <div className="sales-modal__footer">
+              <button type="button" className="btn btn--primary" onClick={() => setCierreResumen(null)}>
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

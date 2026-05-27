@@ -1,104 +1,127 @@
 import { useEffect, useMemo, useState } from "react";
-import { 
-  Calendar, 
-  Hash, 
-  RefreshCw, 
-  CheckCircle2, 
-  XCircle, 
-  AlertCircle 
-} from "lucide-react";
+import { Calendar, CheckCircle2, Hash, XCircle, Search } from "lucide-react";
 import { AlertsService } from "../../api/alerts.service";
 import { listLotesPorVencer } from "../lotes/repository";
 import RevisarLoteModal from "./RevisarLoteModal";
 
-const factorLabel = (f) => {
-  if (f === "ma7") return "Tendencia (MA7)";
-  if (f === "lag1") return "Ult. dia";
-  if (f === "lag7") return "Hace 1 semana";
-  if (typeof f === "string" && f.startsWith("dow_")) {
-    const k = parseInt(f.split("_")[1], 10);
-    const map = { 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb" };
-    return map[k] || f;
-  }
-  return f;
-};
-
-const reasonText = (a) => {
-  const top = a?.explicacion?.top || [];
-  if (!top.length) return "Estimación de demanda";
-  const first = top[0]?.factor;
-  if (first === "ma7") return "Tendencia ascendente";
-  if (first === "lag1" || first === "lag7") return "Patrón histórico";
-  if (typeof first === "string" && first.startsWith("dow_")) {
-    const dia = factorLabel(first);
-    return `Mayor demanda los ${dia}`;
-  }
-  return `Factor: ${factorLabel(first)}`;
-};
-
 const parseSuggestedUnits = (mensaje) => {
   if (!mensaje) return null;
-  const m = String(mensaje).match(/Sugerido\s+(\d+)\s*ud/i);
-  return m ? Number(m[1]) : null;
+  const match = String(mensaje).match(/Sugerido\s+(\d+)\s*ud/i);
+  return match ? Number(match[1]) : null;
 };
 
 const daysLeft = (isoDate) => {
   try {
-    const d = new Date(isoDate);
+    const target = new Date(isoDate);
     const today = new Date();
-    return Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+    return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
   } catch {
     return null;
   }
 };
 
-const asArray = (x) => {
-  if (Array.isArray(x)) return x;
-  if (Array.isArray(x?.results)) return x.results;
-  if (Array.isArray(x?.data)) return x.data;
+const asArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.results)) return value.results;
+  if (Array.isArray(value?.data)) return value.data;
   return [];
 };
+
+const clamp01 = (value) => Math.max(0, Math.min(1, value));
+
+const getConfidenceMeta = (expParam = {}) => {
+  const exp = expParam || {};
+  // Modelos sin datos suficientes → gris, sin confianza
+  if (exp.modelo === "insuficiente" || exp.modelo === "actividad_insuficiente" || exp.modelo === "error") {
+    return {
+      score: 0,
+      label: "Sin datos",
+      color: "#94a3b8",
+      text: "No hay ventas recientes suficientes para generar una prediccion confiable.",
+      detail: "Se requiere historial de ventas para sugerir cantidades.",
+    };
+  }
+
+  const r2 = Number.isFinite(exp?.r2) ? exp.r2 : null;
+  const wape = Number.isFinite(exp?.wape) ? exp.wape : null;
+  const r2Score = r2 == null ? 0 : clamp01(r2);
+  const wapeScore = wape == null ? r2Score : clamp01(1 - wape);
+  const score = Math.round(((r2Score * 0.35) + (wapeScore * 0.65)) * 100);
+
+  if (score >= 75) {
+    return {
+      score,
+      label: "Alta confianza",
+      color: "#27ae60",
+      text: "La sugerencia es consistente con la demanda reciente y el error historico es bajo.",
+      detail: "Lista para aprobar",
+    };
+  }
+
+  if (score >= 55) {
+    return {
+      score,
+      label: "Confianza moderada",
+      color: "#f39c12",
+      text: "La prediccion es util para decidir compra, aunque conviene revisar contexto comercial.",
+      detail: "Revisar antes de aprobar",
+    };
+  }
+
+  return {
+    score,
+    label: "Revision recomendada",
+    color: "#e74c3c",
+    text: "La demanda es mas inestable y se recomienda revisar el pedido antes de aprobarlo.",
+    detail: "Validar con el equipo",
+  };
+};
+
 
 export default function AlertsAndSuggestions() {
   const [tab, setTab] = useState("caducan");
   const [estado, setEstado] = useState("activa");
   const [diasVenc, setDiasVenc] = useState(60);
-
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-
   const [expiring, setExpiring] = useState([]);
   const [mlAlerts, setMlAlerts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [loteRevisar, setLoteRevisar] = useState(null);
+  const [notice, setNotice] = useState(null);
+
+  const showNotice = (type, title, message = "") => {
+    setNotice({ type, title, message });
+  };
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(null), 4200);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const cargar = async () => {
     setLoading(true);
     setErr("");
     try {
-      // Cargar lotes por vencer
       const lotesRaw = await listLotesPorVencer({ dias: diasVenc, estado });
-      console.log("Lotes crudos:", lotesRaw); // DEBUG
-
-      const lotes = asArray(lotesRaw).map((x) => ({
-        id: x.lote_id || x.id,
-        productoNombre: x.producto_nombre || x.producto?.nombre || "-",
-        numeroLote: x.numero_lote || x.numero || "-",
-        cantidad: x.stock_lote || x.cantidad || 0,
-        fechaCaducidad: x.fecha_caducidad,
-        diasRestantes: x.days_left || daysLeft(x.fecha_caducidad),
+      const lotes = asArray(lotesRaw).map((item) => ({
+        id: item.lote_id || item.id,
+        productoNombre: item.producto_nombre || item.producto?.nombre || "-",
+        numeroLote: item.numero_lote || item.numero || "-",
+        cantidad: item.stock_lote || item.cantidad || 0,
+        fechaCaducidad: item.fecha_caducidad,
+        diasRestantes: item.days_left ?? daysLeft(item.fecha_caducidad),
       }));
 
-      // Cargar alertas
       const alerts = await AlertsService.list({ estado });
-      console.log("Alertas crudas:", alerts); // DEBUG
-
-      const mlOnly = alerts.filter((a) => a?.explicacion && Array.isArray(a.explicacion.top));
+      const mlOnly = alerts.filter((item) => item?.explicacion && Array.isArray(item.explicacion.top));
 
       setExpiring(lotes);
       setMlAlerts(mlOnly);
-    } catch (e) {
-      console.error("Error cargando datos:", e);
-      setErr(e?.response?.data?.detail || "No fue posible cargar datos.");
+    } catch (error) {
+      console.error("Error cargando alertas:", error);
+      setErr(error?.response?.data?.detail || "No fue posible cargar datos.");
     } finally {
       setLoading(false);
     }
@@ -108,12 +131,12 @@ export default function AlertsAndSuggestions() {
     cargar();
   }, [estado, diasVenc]);
 
-  const onResolve = async (id) => {
+  const onResolve = async (id, decision = "revisada") => {
     try {
-      await AlertsService.resolve(id);
+      await AlertsService.resolve(id, decision);
       await cargar();
-    } catch (e) {
-      alert(e?.response?.data?.detail || "No fue posible resolver la alerta.");
+    } catch (error) {
+      showNotice("error", "No fue posible actualizar la alerta", error?.payload?.detail || error?.response?.data?.detail || "Intentalo nuevamente.");
     }
   };
 
@@ -121,41 +144,44 @@ export default function AlertsAndSuggestions() {
     try {
       await AlertsService.recalcPredict(14);
       await cargar();
-      alert("Sugerencias recalculadas con predicción (h=14).");
-    } catch (e) {
-      alert(e?.response?.data?.detail || "No fue posible recalcular con predicción.");
+      showNotice("success", "Sugerencias recalculadas", "Prediccion actualizada para los proximos 14 dias.");
+    } catch (error) {
+      showNotice("error", "No fue posible recalcular", error?.payload?.detail || error?.response?.data?.detail || "Intentalo nuevamente.");
     }
   };
 
+  const filteredExpiring = useMemo(() => {
+    if (!searchTerm) return expiring;
+    const lower = searchTerm.toLowerCase();
+    return expiring.filter(row => {
+        const name = (row.productoNombre || "").toLowerCase();
+        const lote = (row.numeroLote || "").toLowerCase();
+        return name.includes(lower) || lote.includes(lower);
+    });
+  }, [expiring, searchTerm]);
+
   const rowsCaducan = useMemo(
     () =>
-      (expiring || []).map((r, i) => {
-        const dias = r.diasRestantes;
+      filteredExpiring.map((row, index) => {
+        const dias = row.diasRestantes;
         const caducado = dias != null && dias < 0;
-        const estadoDia = dias === null ? "-" : caducado ? "Caducada" : dias;
+        const estadoDia = dias == null ? "-" : caducado ? "Caducada" : dias;
 
-        // Formato condicional: rojo ≤30, naranja 31-45, normal >45
         let diasClass = "text-dias-normal";
-        if (dias === null) diasClass = "";
+        if (dias == null) diasClass = "";
         else if (dias <= 30) diasClass = "text-dias-red";
         else if (dias <= 45) diasClass = "text-dias-orange";
 
         return (
-          <tr key={r.id || i}>
-            <td>{r.productoNombre}</td>
-            <td>{r.numeroLote}</td>
-            <td>{r.cantidad ? `${r.cantidad} unidades` : "-"}</td>
-            <td className="mono">{r.fechaCaducidad || "-"}</td>
-            <td className={diasClass}>
-              {caducado ? "Caducada" : estadoDia}
-            </td>
+          <tr key={row.id || index}>
+            <td>{row.productoNombre}</td>
+            <td>{row.numeroLote}</td>
+            <td>{row.cantidad ? `${row.cantidad} unidades` : "-"}</td>
+            <td className="mono">{row.fechaCaducidad || "-"}</td>
+            <td className={diasClass}>{caducado ? "Caducada" : estadoDia}</td>
             <td className="text-right">
-              {r.cantidad > 0 ? (
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => setLoteRevisar(r)}
-                >
+              {row.cantidad > 0 ? (
+                <button type="button" className="link" onClick={() => setLoteRevisar(row)}>
                   Revisar
                 </button>
               ) : (
@@ -165,134 +191,188 @@ export default function AlertsAndSuggestions() {
           </tr>
         );
       }),
-    [expiring]
+    [filteredExpiring],
   );
+
+  const filteredMlAlerts = useMemo(() => {
+    if (!searchTerm) return mlAlerts;
+    const lower = searchTerm.toLowerCase();
+    return mlAlerts.filter(a => {
+        const name = (a.producto_nombre || a.productoNombre || "").toLowerCase();
+        const code = (a.productoCodigoBarras || a.productoCodigo || "").toLowerCase();
+        return name.includes(lower) || code.includes(lower);
+    });
+  }, [mlAlerts, searchTerm]);
+
+  const formatResolvedAt = (value) => {
+    if (!value) return "";
+    try {
+      return new Intl.DateTimeFormat("es-CO", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(new Date(value));
+    } catch {
+      return "";
+    }
+  };
+
+  const decisionMeta = (decision) => {
+    if (decision === "aprobada") return { label: "Aprobada", className: "status-pill status-pill--approved" };
+    if (decision === "rechazada") return { label: "Rechazada", className: "status-pill status-pill--rejected" };
+    return { label: "Revisada", className: "status-pill status-pill--reviewed" };
+  };
 
   const rowsReorden = useMemo(
     () =>
-      (mlAlerts || []).map((a) => {
-        const cant = parseSuggestedUnits(a.mensaje);
-        const explicacion = a.explicacion || {};
-        const r2 = explicacion.r2;
-
-        // Semáforo farmacéutico (solo colores y texto simple)
-        let dotColor = '#e74c3c', confLabel = 'Revisión recomendada', confText = 'La predicción tiene baja certeza. Se recomienda revisar con el equipo antes de ordenar.';
-        if (r2 != null) {
-          if (r2 > 0.95) {
-            dotColor = '#e67e22';
-            confLabel = 'Revisar cantidad';
-            confText = 'El sistema detectó un patrón inusual. Verifica el pedido antes de aprobarlo.';
-          } else if (r2 >= 0.80) {
-            dotColor = '#27ae60';
-            confLabel = 'Alta confianza';
-            confText = 'La sugerencia se basa en un patrón de ventas sólido. Puedes aprobarla con seguridad.';
-          } else if (r2 >= 0.60) {
-            dotColor = '#f39c12';
-            confLabel = 'Confianza moderada';
-            confText = 'La predicción es razonable, pero considera revisar el historial del producto.';
-          }
-        }
-
-        const barcode = a.productoCodigoBarras;
-        const idDisplay = barcode || a.productoCodigo || 'Sin ID';
+      filteredMlAlerts.map((alerta) => {
+        const cant = parseSuggestedUnits(alerta.mensaje);
+        const explicacion = alerta.explicacion || {};
+        const meta = getConfidenceMeta(explicacion);
+        const barcode = alerta.productoCodigoBarras;
+        const idDisplay = barcode || alerta.productoCodigo || "Sin ID";
+        const decision = decisionMeta(alerta.decision);
 
         return (
-          <tr key={a.id}>
-            {/* ── MEDICAMENTO ── */}
+          <tr key={alerta.id}>
             <td>
               <div>
-                <strong style={{ fontSize: '1.05rem', color: '#111', display: 'block', marginBottom: '2px' }}>
-                  {a.producto_nombre || a.productoNombre || 'Nombre no disponible'}
+                <strong style={{ fontSize: "1.05rem", color: "#111", display: "block", marginBottom: 2 }}>
+                  {alerta.producto_nombre || alerta.productoNombre || "Nombre no disponible"}
                 </strong>
-                <div style={{ fontSize: '0.8rem', color: '#555', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    fontFamily: 'monospace', background: '#f0f0f0', padding: '1px 6px',
-                    borderRadius: '3px', fontSize: '0.78rem', letterSpacing: '0.5px'
-                  }}>
+                <div style={{ fontSize: "0.8rem", color: "#555", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontFamily: "monospace",
+                      background: "#f0f0f0",
+                      padding: "1px 6px",
+                      borderRadius: 3,
+                      fontSize: "0.78rem",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
                     <Hash size={12} strokeWidth={2.5} color="#64748b" />
-                    {barcode || idDisplay}
+                    {idDisplay}
                   </span>
-                  {barcode && a.productoCodigo && (
-                    <span style={{ color: '#999', fontSize: '0.75rem' }}>
-                      Cód: {a.productoCodigo}
-                    </span>
-                  )}
                 </div>
               </div>
             </td>
 
-            {/* ── CANTIDAD SUGERIDA ── */}
             <td>
-              <strong style={{ fontSize: '1.1rem', color: '#2c5aa0' }}>
-                {Number.isFinite(cant) ? `${cant} uds` : a.mensaje}
+              <strong style={{ fontSize: "1.1rem", color: "#2c5aa0" }}>
+                {Number.isFinite(cant) ? `${cant} uds` : alerta.mensaje}
               </strong>
               {explicacion.safety > 0 && (
-                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '2px' }}>
-                  Incl. {explicacion.safety} uds seguridad
+                <div style={{ fontSize: "0.75rem", color: "#888", marginTop: 2 }}>
+                  Incl. {explicacion.safety} uds de seguridad
                 </div>
               )}
             </td>
 
-            {/* ── SEMÁFORO DE CONFIANZA (vista farmacéutico) ── */}
             <td>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                {/* Semáforo */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', paddingTop: '2px' }}>
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: dotColor === '#27ae60' ? '#27ae60' : '#ddd', boxShadow: dotColor === '#27ae60' ? '0 0 6px #27ae60aa' : 'none' }} />
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: dotColor === '#f39c12' ? '#f39c12' : '#ddd', boxShadow: dotColor === '#f39c12' ? '0 0 6px #f39c12aa' : 'none' }} />
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: (dotColor === '#e74c3c' || dotColor === '#e67e22') ? dotColor : '#ddd', boxShadow: (dotColor === '#e74c3c' || dotColor === '#e67e22') ? `0 0 6px ${dotColor}aa` : 'none' }} />
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, paddingTop: 2 }}>
+                  <div
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: "50%",
+                      background: meta.color === "#27ae60" ? "#27ae60" : "#ddd",
+                      boxShadow: meta.color === "#27ae60" ? "0 0 6px #27ae60aa" : "none",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: "50%",
+                      background: meta.color === "#f39c12" ? "#f39c12" : "#ddd",
+                      boxShadow: meta.color === "#f39c12" ? "0 0 6px #f39c12aa" : "none",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: "50%",
+                      background: meta.color === "#e74c3c" ? "#e74c3c" : "#ddd",
+                      boxShadow: meta.color === "#e74c3c" ? "0 0 6px #e74c3caa" : "none",
+                    }}
+                  />
                 </div>
-                {/* Texto */}
+
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: dotColor, marginBottom: '3px' }}>
-                    {confLabel}
+                  <div style={{ fontWeight: 700, fontSize: "0.85rem", color: meta.color, marginBottom: 3 }}>
+                    {meta.label} ({meta.score}%)
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: '#555', lineHeight: 1.4, maxWidth: 200 }}>
-                    {confText}
+                  <div style={{ fontSize: "0.78rem", color: "#555", lineHeight: 1.4, maxWidth: 240 }}>
+                    {meta.text}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>
+                    {meta.detail}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.75rem", color: "#888", marginTop: 4 }}>
                     <Calendar size={12} strokeWidth={2.5} color="#64748b" />
-                    Para los próximos {explicacion.h || 14} días
+                    Para los proximos {explicacion.h || 14} dias
                   </div>
                 </div>
               </div>
             </td>
 
-            {/* ── ESTADO ── */}
             <td>
-              <span className="tag tag-blue">Sugerencia ML</span>
+              {alerta.estado === "resuelta" ? (
+                <div className="resolved-state">
+                  <span className={decision.className}>{decision.label}</span>
+                  {alerta.resueltoEn ? (
+                    <span className="resolved-date">{formatResolvedAt(alerta.resueltoEn)}</span>
+                  ) : null}
+                </div>
+              ) : (
+                <span className="tag tag-blue">Sugerencia ML</span>
+              )}
             </td>
 
-            {/* ── ACCIONES ── */}
-            <td className="text-right">
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => onResolve(a.id)}
-                style={{ marginRight: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <CheckCircle2 size={16} />
-                Aprobar
-              </button>
-              <button
-                type="button"
-                className="btn danger"
-                onClick={() => onResolve(a.id)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <XCircle size={16} />
-                Rechazar
-              </button>
-            </td>
+            {estado === "activa" ? (
+              <td className="text-right" style={{ verticalAlign: "middle" }}>
+                <div className="suggestion-actions">
+                  <button
+                    type="button"
+                    className="btn primary suggestion-action"
+                    onClick={() => onResolve(alerta.id, "aprobada")}
+                  >
+                    <CheckCircle2 size={16} />
+                    Aprobar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn danger suggestion-action"
+                    onClick={() => onResolve(alerta.id, "rechazada")}
+                  >
+                    <XCircle size={16} />
+                    Rechazar
+                  </button>
+                </div>
+              </td>
+            ) : null}
           </tr>
         );
       }),
-    [mlAlerts]
+    [estado, filteredMlAlerts],
   );
 
   return (
     <section className="alerts-scope alerts-wrapper" aria-labelledby="alerts-title">
+      {notice && (
+        <div className={`alerts-toast alerts-toast--${notice.type}`} role="status" aria-live="polite">
+          <strong>{notice.title}</strong>
+          {notice.message ? <span>{notice.message}</span> : null}
+          <button type="button" aria-label="Cerrar mensaje" onClick={() => setNotice(null)}>x</button>
+        </div>
+      )}
+
       <h1 id="alerts-title">Alertas y sugerencias</h1>
 
       <div className="card" style={{ paddingTop: 0 }}>
@@ -306,7 +386,7 @@ export default function AlertsAndSuggestions() {
             className={`tab ${tab === "caducan" ? "active" : ""}`}
             onClick={() => setTab("caducan")}
           >
-            Artículos que caducan
+            Articulos que caducan
           </button>
           <button
             type="button"
@@ -322,69 +402,92 @@ export default function AlertsAndSuggestions() {
 
           <div className="spacer" />
 
-          <div className="controls row gap-2">
-            <label htmlFor="sel-estado">Estado:</label>
-            <select id="sel-estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
-              <option value="activa">Activas</option>
-              <option value="resuelta">Resueltas</option>
-            </select>
+          <div className="alerts-toolbar">
+            <div className="alerts-search-group">
+              <Search size={16} className="alerts-search-icon" />
+              <input
+                type="text"
+                className="alerts-search-input"
+                placeholder="Buscar por medicamento o codigo de barras..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                aria-label="Buscar por medicamento o codigo de barras"
+              />
+              {searchTerm ? (
+                <button
+                  type="button"
+                  className="alerts-search-clear"
+                  onClick={() => setSearchTerm("")}
+                  aria-label="Limpiar busqueda"
+                >
+                  <XCircle size={16} />
+                </button>
+              ) : null}
+            </div>
 
-            {tab === "caducan" ? (
-              <>
-                <label htmlFor="dias-input">Días:</label>
-                <input
-                  id="dias-input"
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={diasVenc}
-                  onChange={(e) => setDiasVenc(Number(e.target.value || 60))}
-                  style={{ width: 72 }}
-                />
-              </>
-            ) : (
-              <button type="button" className="btn primary" onClick={onRecalcPredict}>
-                Recalcular (con predicción)
-              </button>
-            )}
+            <div className="alerts-filters controls row gap-2">
+              <label htmlFor="sel-estado" className="alerts-filter-label">Estado</label>
+              <select
+                id="sel-estado"
+                className="alerts-filter-control"
+                value={estado}
+                onChange={(e) => setEstado(e.target.value)}
+              >
+                <option value="activa">Activas</option>
+                <option value="resuelta">Resueltas</option>
+              </select>
+
+              {tab === "caducan" ? (
+                <>
+                  <label htmlFor="dias-input" className="alerts-filter-label">Dias</label>
+                  <input
+                    id="dias-input"
+                    type="number"
+                    min={1}
+                    max={365}
+                    className="alerts-filter-control alerts-filter-control--sm"
+                    value={diasVenc}
+                    onChange={(e) => setDiasVenc(Number(e.target.value || 60))}
+                  />
+                </>
+              ) : (
+                <button type="button" className="btn primary alerts-recalc-btn" onClick={onRecalcPredict}>
+                  Recalcular (con prediccion)
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         {err && <div className="card error">{err}</div>}
         {loading && (
           <div className="card" role="status" aria-live="polite">
-            Cargando…
+            Cargando...
           </div>
         )}
 
-        {/* Panel: Caducan */}
         {!loading && !err && (
-          <div
-            id="panel-caducan"
-            role="tabpanel"
-            aria-labelledby="tab-caducan"
-            hidden={tab !== "caducan"}
-          >
+          <div id="panel-caducan" role="tabpanel" aria-labelledby="tab-caducan" hidden={tab !== "caducan"}>
             <div className="table-wrapper">
               <table className="w-full">
-                <caption className="sr-only">Lotes próximos a caducar</caption>
+                <caption className="sr-only">Lotes proximos a caducar</caption>
                 <thead>
                   <tr>
                     <th scope="col">NOMBRE DEL PRODUCTO</th>
-                    <th scope="col">NÚMERO DE LOTE</th>
+                    <th scope="col">NUMERO DE LOTE</th>
                     <th scope="col">CANTIDAD</th>
                     <th scope="col">FECHA DE CADUCIDAD</th>
-                    <th scope="col">DÍAS RESTANTES</th>
+                    <th scope="col">DIAS RESTANTES</th>
                     <th scope="col" className="sr-only">ACCIONES</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {expiring.length ? (
+                  {filteredExpiring.length ? (
                     rowsCaducan
                   ) : (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>
-                        <em>No hay lotes próximos a caducar</em>
+                      <td colSpan={6} style={{ textAlign: "center", padding: 20 }}>
+                        <em>No hay lotes que coincidan con la busqueda o proximos a caducar</em>
                       </td>
                     </tr>
                   )}
@@ -394,14 +497,8 @@ export default function AlertsAndSuggestions() {
           </div>
         )}
 
-        {/* Panel: Reorden */}
         {!loading && !err && (
-          <div
-            id="panel-reorden"
-            role="tabpanel"
-            aria-labelledby="tab-reorden"
-            hidden={tab !== "reorden"}
-          >
+          <div id="panel-reorden" role="tabpanel" aria-labelledby="tab-reorden" hidden={tab !== "reorden"}>
             <div className="table-wrapper">
               <table className="w-full">
                 <caption className="sr-only">Sugerencias de reordenamiento</caption>
@@ -411,16 +508,18 @@ export default function AlertsAndSuggestions() {
                     <th scope="col">CANTIDAD SUGERIDA</th>
                     <th scope="col">CONFIANZA</th>
                     <th scope="col">ESTADO</th>
-                    <th scope="col" className="text-right">ACCIONES</th>
+                    {estado === "activa" ? (
+                      <th scope="col" className="text-right">ACCIONES</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {mlAlerts.length ? (
+                  {filteredMlAlerts.length ? (
                     rowsReorden
                   ) : (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
-                        <em>No hay sugerencias generadas. Haz clic en "Recalcular" para generarlas.</em>
+                      <td colSpan={estado === "activa" ? 5 : 4} style={{ textAlign: "center", padding: 20 }}>
+                        <em>No hay sugerencias generadas que coincidan con la busqueda. Haz clic en "Recalcular" para generarlas.</em>
                       </td>
                     </tr>
                   )}
@@ -431,7 +530,6 @@ export default function AlertsAndSuggestions() {
         )}
       </div>
 
-      {/* Modal de revisión de lote */}
       {loteRevisar && (
         <RevisarLoteModal
           lote={loteRevisar}

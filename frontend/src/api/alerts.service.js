@@ -13,6 +13,7 @@ const fromApi = (a) => ({
   loteId: a.lote,
   creadoEn: a.created_at,
   resueltoEn: a.resolved_at,
+  decision: a.decision,
   explicacion: a.explicacion || null,
 });
 
@@ -31,8 +32,8 @@ export const AlertsService = {
     return AlertsRepository.recalcPredict(h, usuario_id);
   },
 
-  async resolve(id) {
-    await AlertsRepository.resolve(id);
+  async resolve(id, decision = "revisada") {
+    await AlertsRepository.resolve(id, decision);
     return true;
   },
 };

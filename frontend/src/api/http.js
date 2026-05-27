@@ -60,13 +60,17 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
           res = await doFetch(method, path, body, headers); // reintento
         }
       }
-    } catch (_) { /* ignore */ }
+    } catch {
+      // Ignore refresh errors and propagate the original response.
+    }
   }
 
 
   if (!res.ok) {
     let data = null;
-    try { data = await res.json(); } catch { }
+    try { data = await res.json(); } catch {
+      // Ignore invalid JSON payloads from error responses.
+    }
     if (import.meta.env.DEV) console.warn("API error", res.status, data);
     const err = new Error(firstErrorFromPayload(data) || `Error ${res.status}`);
     err.status = res.status;

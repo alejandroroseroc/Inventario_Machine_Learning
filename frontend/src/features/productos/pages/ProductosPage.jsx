@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import "../../../styles/productos.css";
 import ProductoForm from "../components/ProductoForm";
 import ProductoTable from "../components/ProductoTable";
-import { FileUp, ArrowLeft } from "lucide-react";
+import { FileUp, ArrowLeft, Search } from "lucide-react";
 import { importarCSV } from "../importService";
 import { productoCreate, productosList } from "../service";
 
@@ -14,6 +14,7 @@ export default function ProductosPage() {
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const fileInputRef = useRef(null);
 
 
@@ -48,6 +49,17 @@ export default function ProductosPage() {
       e.target.value = ""; // Reset input
     }
   }
+
+  const filteredItems = useMemo(() => {
+    if (!searchTerm) return items;
+    const lower = searchTerm.toLowerCase();
+    return items.filter(item => {
+        const name = (item.nombre || "").toLowerCase();
+        const code = (item.codigo || "").toLowerCase();
+        const barcode = (item.codigo_barras || "").toLowerCase();
+        return name.includes(lower) || code.includes(lower) || barcode.includes(lower);
+    });
+  }, [items, searchTerm]);
 
   return (
     <div className="page page--productos">
@@ -101,8 +113,21 @@ export default function ProductosPage() {
 
       <ProductoForm onSubmit={handleCreate} submitting={creating} />
 
-      <h3 style={{ marginTop: 24 }}>Listado</h3>
-      {loading ? <p>Cargando…</p> : <ProductoTable items={items} />}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, marginBottom: 12 }}>
+        <h3 style={{ margin: 0 }}>Listado</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", padding: "6px 12px", borderRadius: 8, border: "1px solid #d1d5db", minWidth: 250 }}>
+          <Search size={16} color="#9ca3af" />
+          <input
+            type="text"
+            placeholder="Buscar medicamento..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ border: "none", outline: "none", background: "transparent", width: "100%", fontSize: "0.9rem", color: "#1e293b" }}
+          />
+        </div>
+      </div>
+      
+      {loading ? <p>Cargando…</p> : <ProductoTable items={filteredItems} />}
     </div>
   );
 }

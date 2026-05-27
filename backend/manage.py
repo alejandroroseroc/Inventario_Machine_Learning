@@ -11,6 +11,8 @@ if REPO_ROOT not in sys.path:
 
 def main():
     """Run administrative tasks."""
+    # Ensure test discovery works even when executed from repo root.
+    os.chdir(BASE_DIR)
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
     try:
         from django.core.management import execute_from_command_line

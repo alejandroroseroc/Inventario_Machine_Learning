@@ -37,6 +37,7 @@ export default function RegistrarVentaPage() {
   // ------- LISTA DEL DÍA -------
   const [ventas, setVentas] = useState([]);
   const [totalDia, setTotalDia] = useState(0);
+  const [gananciaDia, setGananciaDia] = useState(0);
 
   // ------- HISTORIAL PAGINADO -------
   const [historialPaginado, setHistorialPaginado] = useState(null);
@@ -103,6 +104,7 @@ export default function RegistrarVentaPage() {
       setVentas(vs || []);
       const c = await getCierreDia();
       setTotalDia(Number(c?.total_dia ?? 0));
+      setGananciaDia(Number(c?.ganancia_dia ?? 0));
     } catch { /* noop */ }
   };
 
@@ -456,6 +458,11 @@ export default function RegistrarVentaPage() {
               <td className="text-right"><b>${money(totalDia)}</b></td>
               <td></td>
             </tr>
+            <tr>
+              <td colSpan={4} className="text-right" style={{ color: "#475569", fontSize: "0.9rem" }}>Ganancia estimada</td>
+              <td className="text-right" style={{ color: "#059669" }}><b>${money(gananciaDia)}</b></td>
+              <td></td>
+            </tr>
           </tfoot>
         </table>
       </div>
@@ -463,7 +470,11 @@ export default function RegistrarVentaPage() {
       <div className="actions actions--end">
         <button
           className="btn"
-          onClick={handleCierreDelDia}
+          onClick={async () => {
+            const c = await getCierreDia().catch(() => null);
+            if (!c) return alert("No se pudo obtener el cierre.");
+            alert(`Cierre de hoy\nVentas: ${c.ventas_registradas}\nAnuladas: ${c.ventas_anuladas}\nTotal día: $${money(c.total_dia)}\nGanancia estimada: $${money(c.ganancia_dia ?? 0)}`);
+          }}
         >
           Cierre del día
         </button>

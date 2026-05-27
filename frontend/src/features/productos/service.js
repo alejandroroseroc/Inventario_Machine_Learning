@@ -14,17 +14,22 @@ export async function productosList() {
 }
 
 export async function productoCreate(dto) {
-  // Normalización mínima → números
   const payload = {
     codigo: (dto.codigo || "").trim(),
     nombre: (dto.nombre || "").trim(),
     categoria: dto.categoria || "C",
     punto_reorden: Number(dto.punto_reorden || 0),
     valor_unitario: Number(dto.valor_unitario || 0),
+    precio_costo: Number(dto.precio_costo || 0),
+    margen_ganancia: Number(dto.margen_ganancia || 0),
   };
 
   if (!payload.codigo) throw new Error("El código es obligatorio.");
   if (!payload.nombre) throw new Error("El nombre es obligatorio.");
+
+  if (dto.lote_inicial) {
+    payload.lote_inicial = dto.lote_inicial;
+  }
 
   const created = await repoCreateProducto(payload);
   return created;

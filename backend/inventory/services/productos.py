@@ -71,6 +71,13 @@ def registrar_producto(data, usuario):
     valor_unitario = data.get("valor_unitario")
     if valor_unitario is None:
         valor_unitario = Decimal("0")
+    precio_costo = data.get("precio_costo") or Decimal("0")
+    margen_ganancia = data.get("margen_ganancia") or Decimal("0")
+
+    pc_float = float(precio_costo)
+    mg_float = float(margen_ganancia)
+    if pc_float > 0 and mg_float > 0:
+        valor_unitario = Decimal(str(round(pc_float * (1 + mg_float / 100), 2)))
 
     p = Producto.objects.create(
         usuario=usuario,
@@ -79,6 +86,8 @@ def registrar_producto(data, usuario):
         categoria=categoria or "C",
         punto_reorden=punto_reorden or 0,
         valor_unitario=valor_unitario,
+        precio_costo=precio_costo,
+        margen_ganancia=margen_ganancia,
     )
 
     if not data.get("punto_reorden"):

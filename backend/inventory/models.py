@@ -16,6 +16,14 @@ class Producto(models.Model):
     categoria = models.CharField(max_length=1, choices=[("A","A"),("B","B"),("C","C")], default="C")
     punto_reorden = models.IntegerField(default=0)
     valor_unitario = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    precio_costo = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Precio al que llega del laboratorio/proveedor"
+    )
+    margen_ganancia = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Porcentaje de ganancia (ej: 15 = 15%)"
+    )
     codigo_barras = models.CharField(max_length=32, blank=True, null=True)
 
     class Meta:

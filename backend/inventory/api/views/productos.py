@@ -1,4 +1,4 @@
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from datetime import timedelta
 from math import ceil
 
-from inventory.models import Producto, Movimiento
+from inventory.models import Lote, Producto, Movimiento
 from inventory.api.serializers import ProductoSerializer
 from inventory.services import registrar_producto, obtener_productos, recalcular_productos
 from ml.baseline import predict_next_month_from_series
@@ -42,7 +42,24 @@ class ProductoListCreateView(generics.ListCreateAPIView):
         if not ser.is_valid():
             return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
-            producto = registrar_producto(ser.validated_data, request.user)
+            with transaction.atomic():
+                producto = registrar_producto(ser.validated_data, request.user)
+
+                lote_inicial = request.data.get("lote_inicial")
+                if lote_inicial:
+                    fecha_caducidad = lote_inicial.get("fecha_caducidad")
+                    stock_lote = lote_inicial.get("stock_lote")
+                    if not fecha_caducidad or not stock_lote:
+                        return Response(
+                            {"lote_inicial": "fecha_caducidad y stock_lote son requeridos."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    Lote.objects.create(
+                        producto=producto,
+                        fecha_caducidad=fecha_caducidad,
+                        stock_lote=int(stock_lote),
+                        numero_lote=lote_inicial.get("numero_lote") or None,
+                    )
         except IntegrityError:
             return Response({"codigo": ["El código ya existe."]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(ProductoSerializer(producto).data, status=status.HTTP_201_CREATED)

@@ -1,5 +1,12 @@
 import { Link } from "react-router-dom";
 
+const cop = (n) =>
+  Number(n || 0).toLocaleString("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  });
+
 export default function ProductoTable({ items = [] }) {
   if (!items || items.length === 0) return <p>No hay productos registrados.</p>;
 
@@ -8,7 +15,18 @@ export default function ProductoTable({ items = [] }) {
       <table className="table">
         <thead>
           <tr>
-            <th>ID</th><th>Código</th><th>Nombre</th><th>Categoría</th><th>Punto Reorden</th><th>Valor Unitario</th><th className="text-right">Acciones</th>
+            <th>ID</th>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Categoría</th>
+            <th>Punto Reorden</th>
+            <th>PRECIO COSTO</th>
+            <th>MARGEN</th>
+            <th>
+              PRECIO VENTA
+              <div style={{ fontSize: "0.7rem", fontWeight: 400, color: "#94a3b8" }}>por unidad</div>
+            </th>
+            <th className="text-right">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -19,7 +37,11 @@ export default function ProductoTable({ items = [] }) {
               <td>{p.nombre}</td>
               <td><Chip kind={p.categoria} /></td>
               <td>{p.punto_reorden}</td>
-              <td>${Number(p.valor_unitario).toLocaleString("es-CO")}</td>
+              <td>{cop(p.precio_costo)}</td>
+              <td style={{ color: Number(p.margen_ganancia) > 0 ? "#059669" : "#94a3b8" }}>
+                {Number(p.margen_ganancia || 0).toFixed(1)}%
+              </td>
+              <td>{cop(p.valor_unitario)}</td>
               <td className="text-right">
                 <Link to={`/productos/${p.id}`} className="btn">Ver detalle</Link>
               </td>

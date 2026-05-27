@@ -14,11 +14,15 @@ def productos_con_stock_total(usuario=None):
     )
 
 def valor_total_inventario(usuario=None):
+    """
+    Valor contable del inventario = suma de
+    (stock_lote * precio_costo) solo para lotes activos.
+    """
     expr = ExpressionWrapper(
-        Coalesce(F("stock_lote"), 0) * Coalesce(F("producto__valor_unitario"), 0),
+        Coalesce(F("stock_lote"), 0) * Coalesce(F("producto__precio_costo"), 0),
         output_field=DecimalField(max_digits=18, decimal_places=2),
     )
-    qs = Lote.objects.select_related("producto")
+    qs = Lote.objects.select_related("producto").filter(estado="activo")
     if usuario:
         qs = qs.filter(producto__usuario=usuario)
     agg = qs.aggregate(total=Sum(expr))

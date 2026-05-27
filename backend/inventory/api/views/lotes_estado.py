@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
 
-from inventory.models import Lote
+from inventory.models import Lote, Movimiento
 from inventory.api.serializers import LoteSerializer
 
 
@@ -39,6 +39,7 @@ class LotesVencidosListView(APIView):
     """
     GET /api/inventory/lotes/vencidos
     Lista lotes con estado='vencido' del usuario.
+    La cantidad real se obtiene del Movimiento de baja asociado.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -50,6 +51,14 @@ class LotesVencidosListView(APIView):
         )
         items = []
         for l in qs:
+            mov = (
+                Movimiento.objects
+                .filter(lote=l, tipo="baja_vencimiento")
+                .order_by("-fecha_mov")
+                .first()
+            )
+            cantidad_real = mov.cantidad if mov else 0
+            costo = float(l.producto.precio_costo or 0)
             items.append({
                 "lote_id": l.id,
                 "producto_id": l.producto_id,
@@ -58,9 +67,9 @@ class LotesVencidosListView(APIView):
                 "numero_lote": l.numero_lote or "-",
                 "fecha_caducidad": l.fecha_caducidad.isoformat(),
                 "fecha_ingreso": l.fecha_ingreso.isoformat(),
-                "stock_retirado": l.stock_lote,
-                "precio_costo": float(l.producto.precio_costo or 0),
-                "perdida_total": float(l.producto.precio_costo or 0) * l.stock_lote,
+                "stock_retirado": cantidad_real,
+                "precio_costo": costo,
+                "perdida_total": costo * cantidad_real,
                 "estado": l.estado,
             })
         return Response({"count": len(items), "results": items})
@@ -70,6 +79,7 @@ class LotesDevolucionListView(APIView):
     """
     GET /api/inventory/lotes/devoluciones
     Lista lotes con estado='devolucion' del usuario.
+    La cantidad real se obtiene del Movimiento de devolución asociado.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -81,6 +91,13 @@ class LotesDevolucionListView(APIView):
         )
         items = []
         for l in qs:
+            mov = (
+                Movimiento.objects
+                .filter(lote=l, tipo="devolucion_proveedor")
+                .order_by("-fecha_mov")
+                .first()
+            )
+            cantidad_real = mov.cantidad if mov else 0
             costo = float(l.producto.precio_costo or 0)
             items.append({
                 "lote_id": l.id,
@@ -90,9 +107,9 @@ class LotesDevolucionListView(APIView):
                 "numero_lote": l.numero_lote or "-",
                 "fecha_caducidad": l.fecha_caducidad.isoformat(),
                 "fecha_ingreso": l.fecha_ingreso.isoformat(),
-                "stock_devuelto": l.stock_lote,
+                "stock_devuelto": cantidad_real,
                 "precio_costo": costo,
-                "perdida_50": costo * l.stock_lote * 0.5,
+                "perdida_50": costo * cantidad_real * 0.5,
                 "estado": l.estado,
             })
         return Response({"count": len(items), "results": items})

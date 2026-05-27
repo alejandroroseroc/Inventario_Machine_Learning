@@ -9,7 +9,7 @@ class LoteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lote
-        fields = ("id", "producto", "producto_nombre", "numero_lote", "fecha_caducidad", "stock_lote", "fecha_ingreso", "codigo_barras", "days_left")
+        fields = ("id", "producto", "producto_nombre", "numero_lote", "fecha_caducidad", "stock_lote", "fecha_ingreso", "codigo_barras", "days_left", "estado")
 
     def get_days_left(self, obj):
         from django.utils import timezone

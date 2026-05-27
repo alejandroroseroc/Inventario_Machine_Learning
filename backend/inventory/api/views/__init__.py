@@ -18,6 +18,11 @@ from .ventas import VentaListCreateView, VentaDetailView, VentaCierreDiaView, Ve
 from .kpis import KPIView
 from .imports import CSVImportView
 from .gestion_vencimiento import GestionarVencimientoView
+from .lotes_estado import (
+    MarcarVencidosAutoView,
+    LotesVencidosListView,
+    LotesDevolucionListView,
+)
 
 __all__ = [
     # Productos
@@ -49,5 +54,9 @@ __all__ = [
     "CSVImportView",
     # Gestión vencimiento
     "GestionarVencimientoView",
+    # Lotes por estado
+    "MarcarVencidosAutoView",
+    "LotesVencidosListView",
+    "LotesDevolucionListView",
 ]
 

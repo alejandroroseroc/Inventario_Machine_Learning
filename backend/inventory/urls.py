@@ -22,6 +22,9 @@ from .api.views import (
     VentaHistorialView,
     CSVImportView,
     GestionarVencimientoView,
+    MarcarVencidosAutoView,
+    LotesVencidosListView,
+    LotesDevolucionListView,
 )
 
 
@@ -39,6 +42,9 @@ urlpatterns = [
     # Lotes
     path("inventory/lotes", LoteListCreateView.as_view(), name="lotes-list-create"),
     path("inventory/lotes/por-vencer", LotesPorVencerView.as_view(), name="lotes-por-vencer"),
+    path("inventory/lotes/marcar-vencidos", MarcarVencidosAutoView.as_view(), name="lotes-marcar-vencidos"),
+    path("inventory/lotes/vencidos", LotesVencidosListView.as_view(), name="lotes-vencidos"),
+    path("inventory/lotes/devoluciones", LotesDevolucionListView.as_view(), name="lotes-devoluciones"),
     path("inventory/lotes/<int:pk>/gestionar_vencimiento", GestionarVencimientoView.as_view(), name="lote-gestionar-vencimiento"),
 
     # Movimientos

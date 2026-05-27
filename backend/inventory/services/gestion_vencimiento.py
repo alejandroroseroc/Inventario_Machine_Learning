@@ -62,9 +62,13 @@ def gestionar_vencimiento(*, usuario, lote_id: int) -> dict:
         fecha_mov=timezone.now(),
     )
 
-    # ── Poner stock a 0 ──────────────────────────────────────────────
+    # ── Actualizar stock y estado del lote ──────────────────────────
+    if tipo == "devolucion_proveedor":
+        lote.estado = "devolucion"
+    else:
+        lote.estado = "vencido"
     lote.stock_lote = 0
-    lote.save(update_fields=["stock_lote"])
+    lote.save(update_fields=["stock_lote", "estado"])
 
     # ── Resolver alertas de caducidad asociadas ──────────────────────
     alertas_resueltas = Alerta.objects.filter(
@@ -72,6 +76,13 @@ def gestionar_vencimiento(*, usuario, lote_id: int) -> dict:
         tipo="caducidad",
         estado="activa",
     ).update(estado="resuelta", resolved_at=timezone.now())
+
+    precio_costo = float(lote.producto.precio_costo or 0)
+    perdida_estimada = (
+        precio_costo * cantidad_retirada
+        if tipo == "baja_vencimiento"
+        else precio_costo * cantidad_retirada * 0.5
+    )
 
     return {
         "lote_id": lote.id,
@@ -83,4 +94,7 @@ def gestionar_vencimiento(*, usuario, lote_id: int) -> dict:
         "dias_restantes": dias_restantes,
         "movimiento_id": mov.id,
         "alertas_resueltas": alertas_resueltas,
+        "estado_lote": lote.estado,
+        "precio_costo": precio_costo,
+        "perdida_estimada": perdida_estimada,
     }

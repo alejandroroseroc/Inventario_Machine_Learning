@@ -35,6 +35,8 @@
 }
 @media (max-width: 640px){
   .row, .row--2, .row--4 { grid-template-columns: 1fr; }
+  .producto-edit-grid__row--4,
+  .producto-edit-grid__row--3 { grid-template-columns: 1fr; }
 }
 
 /* ---- Form ---- */
@@ -43,6 +45,18 @@ input, select, button { padding: 10px 12px; border-radius: 10px; border: 1px sol
 input:focus, select:focus { outline: none; border-color: #64748b; box-shadow: 0 0 0 3px rgba(147,197,253,.35); }
 .hint { font-size: 12px; color: #64748b; }
 .label--tiny { font-size: 12px; color: #64748b; }
+
+/* ---- Producto detalle: layout de campos ---- */
+.producto-edit-grid { display: grid; gap: 16px; }
+.producto-edit-grid__row { display: grid; gap: 16px; }
+.producto-edit-grid__row--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.producto-edit-grid__row--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.producto-edit-grid__hint {
+  display: block;
+  color: #64748b;
+  font-size: 0.8rem;
+  grid-column: 1 / -1;
+}
 
 /* ---- Alerts ---- */
 .alert { padding: 12px; border-radius: 12px; margin-bottom: 12px; }

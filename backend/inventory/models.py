@@ -36,12 +36,24 @@ class Producto(models.Model):
         return f"{self.codigo} - {self.nombre}"
 
 class Lote(models.Model):
+    ESTADO_LOTE = (
+        ("activo", "activo"),
+        ("vencido", "vencido"),
+        ("devolucion", "devolucion"),
+    )
+
     producto = models.ForeignKey(Producto, related_name="lotes", on_delete=models.CASCADE)
     fecha_caducidad = models.DateField()
     stock_lote = models.IntegerField(default=0)
     fecha_ingreso = models.DateField(auto_now_add=True)
     numero_lote = models.CharField(max_length=64, blank=True, null=True, db_index=True)
     codigo_barras = models.CharField(max_length=64, blank=True, null=True)
+    estado = models.CharField(
+        max_length=12,
+        choices=ESTADO_LOTE,
+        default="activo",
+        db_index=True,
+    )
 
     def __str__(self):
         return f"Lote #{self.id} ({self.producto.codigo})"

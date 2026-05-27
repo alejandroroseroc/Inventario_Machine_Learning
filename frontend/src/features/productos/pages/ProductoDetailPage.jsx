@@ -218,52 +218,56 @@ export default function ProductoDetailPage() {
       {/* Edición del producto */}
       <section className="card" aria-labelledby="sec_edit_title">
         <h3 id="sec_edit_title" className="sr-only">Editar datos del producto</h3>
-        <div className="row row--2">
-          <div className="col">
-            <label htmlFor="det_codigo">Código</label>
-            <input id="det_codigo" name="codigo" value={form.codigo} onChange={handleChange} />
+        <div className="producto-edit-grid">
+          <div className="producto-edit-grid__row producto-edit-grid__row--4">
+            <div className="col">
+              <label htmlFor="det_codigo">Código</label>
+              <input id="det_codigo" name="codigo" value={form.codigo} onChange={handleChange} />
+            </div>
+            <div className="col">
+              <label htmlFor="det_nombre">Nombre</label>
+              <input id="det_nombre" name="nombre" value={form.nombre} onChange={handleChange} />
+            </div>
+            <div className="col">
+              <label htmlFor="det_categoria">Categoría ABC</label>
+              <select id="det_categoria" name="categoria" value={form.categoria} onChange={handleChange}>
+                <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+              </select>
+            </div>
+            <div className="col">
+              <label htmlFor="det_rop">Punto de reorden (ROP)</label>
+              <input id="det_rop" name="punto_reorden" type="number" value={form.punto_reorden} onChange={handleChange} />
+            </div>
           </div>
-          <div className="col">
-            <label htmlFor="det_nombre">Nombre</label>
-            <input id="det_nombre" name="nombre" value={form.nombre} onChange={handleChange} />
-          </div>
-          <div className="col">
-            <label htmlFor="det_categoria">Categoría ABC</label>
-            <select id="det_categoria" name="categoria" value={form.categoria} onChange={handleChange}>
-              <option value="A">A</option><option value="B">B</option><option value="C">C</option>
-            </select>
-          </div>
-          <div className="col">
-            <label htmlFor="det_rop">Punto de reorden (ROP)</label>
-            <input id="det_rop" name="punto_reorden" type="number" value={form.punto_reorden} onChange={handleChange} />
-          </div>
-          <div className="col" style={{ gridColumn: "1 / -1" }}>
-            <small className="hint" style={{ display: "block", marginBottom: 6 }}>
-              Si ingresas costo y margen, el precio de venta se calcula automáticamente.
-            </small>
-          </div>
-          <div className="col">
-            <label htmlFor="det_costo">Precio Costo (COP)</label>
-            <input id="det_costo" name="precio_costo" type="number" step="0.01" min={0}
-              value={form.precio_costo} onChange={handleChange} />
-          </div>
-          <div className="col">
-            <label htmlFor="det_margen">Margen de Ganancia (%)</label>
-            <input id="det_margen" name="margen_ganancia" type="number" step="0.01" min={0}
-              placeholder="Ej: 15" value={form.margen_ganancia} onChange={handleChange} />
-          </div>
-          <div className="col">
-            <label htmlFor="det_valor">Precio Venta (COP)</label>
-            <input
-              id="det_valor" name="valor_unitario" type="number" step="0.01" min={0}
-              value={form.valor_unitario} onChange={handleChange}
-              readOnly={precioAutoCalculado}
-              disabled={precioAutoCalculado}
-              style={precioAutoCalculado ? { background: "#f1f5f9", cursor: "not-allowed" } : {}}
-            />
-            {precioAutoCalculado && (
-              <small className="hint">Calculado automáticamente. Limpia costo/margen para editar.</small>
-            )}
+
+          <small className="producto-edit-grid__hint">
+            Si ingresas costo y margen, el precio de venta se calcula automáticamente.
+          </small>
+
+          <div className="producto-edit-grid__row producto-edit-grid__row--3">
+            <div className="col">
+              <label htmlFor="det_costo">Precio Costo (COP)</label>
+              <input id="det_costo" name="precio_costo" type="number" step="0.01" min={0}
+                value={form.precio_costo} onChange={handleChange} />
+            </div>
+            <div className="col">
+              <label htmlFor="det_margen">Margen de Ganancia (%)</label>
+              <input id="det_margen" name="margen_ganancia" type="number" step="0.01" min={0}
+                placeholder="Ej: 15" value={form.margen_ganancia} onChange={handleChange} />
+            </div>
+            <div className="col">
+              <label htmlFor="det_valor">Precio Venta (COP)</label>
+              <input
+                id="det_valor" name="valor_unitario" type="number" step="0.01" min={0}
+                value={form.valor_unitario} onChange={handleChange}
+                readOnly={precioAutoCalculado}
+                disabled={precioAutoCalculado}
+                style={precioAutoCalculado ? { background: "#f1f5f9", cursor: "not-allowed" } : {}}
+              />
+              {precioAutoCalculado && (
+                <small className="hint">Calculado automáticamente. Limpia costo/margen para editar.</small>
+              )}
+            </div>
           </div>
         </div>
       </section>

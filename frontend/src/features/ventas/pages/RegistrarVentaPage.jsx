@@ -79,14 +79,27 @@ export default function RegistrarVentaPage() {
     if (!q) { setSugs([]); return; }
     setBuscando(true);
     try {
+      // EAN (6+ chars): buscar primero por producto, que es el caso más común en droguería
+      if (q.length >= 6) {
+        const pres = await buscarProductos(q).catch(() => []);
+        if (Array.isArray(pres) && pres.length > 0) {
+          setSugs(pres);
+          return;
+        }
+      }
+
+      // Si no encontró producto, intentar como número de lote
       const lots = await buscarLotePorNumero(q).catch(() => []);
       if (Array.isArray(lots) && lots.length > 0) {
         const l = lots[0];
         const pId = l.producto?.id ?? l.producto;
-        const pNom = l.producto?.nombre ?? "(producto)";
-        setSugs([{ id: pId, nombre: pNom, valor_unitario: 0, _loteId: l.id }]);
+        const pNom = l.producto_nombre ?? l.producto?.nombre ?? "(producto)";
+        const pPrecio = Number(l.producto_valor_unitario ?? l.producto?.valor_unitario ?? 0);
+        setSugs([{ id: pId, nombre: pNom, valor_unitario: pPrecio, _loteId: l.id }]);
         return;
       }
+
+      // Búsqueda por nombre (menos de 6 caracteres)
       if (q.length >= 3) {
         const pres = await buscarProductos(q).catch(() => []);
         setSugs(pres || []);
@@ -148,7 +161,7 @@ export default function RegistrarVentaPage() {
       const lots = await buscarLotePorNumero(q).catch(() => []);
       if (Array.isArray(lots) && lots.length > 0) {
         const l = lots[0];
-        const p = { id: l.producto?.id ?? l.producto, nombre: l.producto?.nombre ?? "(producto)", valor_unitario: 0 };
+        const p = { id: l.producto?.id ?? l.producto, nombre: l.producto_nombre ?? l.producto?.nombre ?? "(producto)", valor_unitario: Number(l.producto_valor_unitario ?? l.producto?.valor_unitario ?? 0) };
         await selectProduct(p, l.id);
         return;
       }

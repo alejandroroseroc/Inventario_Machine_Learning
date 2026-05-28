@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import "../../../styles/productos.css";
 import { lotesService } from "../../lotes/service";
@@ -10,6 +10,7 @@ import { productoService } from "../service";
 export default function ProductoDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -101,6 +102,31 @@ export default function ProductoDetailPage() {
     }
     prevPrecioRef.current = { precio_costo: pc, margen_ganancia: mg };
   }, [form.precio_costo, form.margen_ganancia]);
+
+  // Pre-llenar desde sugerencia ML aprobada
+  useEffect(() => {
+    const st = location.state;
+    if (st?.desde !== "alerta_ml") return;
+
+    // Pre-llenar cantidad de entrada
+    if (st.sugerido > 0) {
+      setEntradaForm((f) => ({
+        ...f,
+        cantidad: String(st.sugerido),
+      }));
+    }
+
+    // Pre-llenar punto de reorden si viene sugerencia
+    if (st.rop_sugerido != null && st.rop_sugerido > 0) {
+      setForm((f) => ({
+        ...f,
+        punto_reorden: String(Math.round(st.rop_sugerido)),
+      }));
+    }
+
+    // Limpiar el state para que no persista si recarga
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [location.state]);
 
   const precioAutoCalculado = Number(form.precio_costo || 0) > 0 && Number(form.margen_ganancia || 0) > 0;
 
@@ -296,6 +322,17 @@ export default function ProductoDetailPage() {
             <div className="col">
               <label htmlFor="det_rop">Punto de reorden (ROP)</label>
               <input id="det_rop" name="punto_reorden" type="number" value={form.punto_reorden} onChange={handleChange} />
+              {location.state?.desde === "alerta_ml" &&
+               location.state?.rop_sugerido > 0 && (
+                <p style={{
+                  margin: "2px 0 0",
+                  fontSize: "0.78rem",
+                  color: "#059669",
+                  fontWeight: 500,
+                }}>
+                  Punto de reorden actualizado según predicción ML — puedes ajustarlo
+                </p>
+              )}
             </div>
           </div>
 
@@ -308,6 +345,11 @@ export default function ProductoDetailPage() {
               <label htmlFor="det_costo">Precio Costo (COP)</label>
               <input id="det_costo" name="precio_costo" type="number" step="0.01" min={0}
                 value={form.precio_costo} onChange={handleChange} />
+              {location.state?.desde === "alerta_ml" && (
+                <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "#64748b" }}>
+                  Precio registrado actualmente — edita si cambió con el nuevo pedido
+                </p>
+              )}
             </div>
             <div className="col">
               <label htmlFor="det_margen">Margen de Ganancia (%)</label>
@@ -325,6 +367,11 @@ export default function ProductoDetailPage() {
               />
               {precioAutoCalculado && (
                 <small className="hint">Calculado automáticamente. Limpia costo/margen para editar.</small>
+              )}
+              {location.state?.desde === "alerta_ml" && (
+                <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "#64748b" }}>
+                  Precio registrado actualmente — edita si cambió con el nuevo pedido
+                </p>
               )}
             </div>
           </div>
@@ -441,6 +488,45 @@ export default function ProductoDetailPage() {
           )}
         </div>
       </section>
+
+      {/* Banner ML */}
+      {location.state?.desde === "alerta_ml" && (
+        <div style={{
+          background: "#eff6ff",
+          border: "1px solid #bfdbfe",
+          borderRadius: 12,
+          padding: "14px 18px",
+          marginBottom: 16,
+          display: "flex",
+          gap: 12,
+          alignItems: "flex-start",
+        }}>
+          <span style={{ fontSize: "1.2rem", marginTop: 2 }}>ℹ</span>
+          <div>
+            <p style={{
+              margin: "0 0 4px",
+              fontWeight: 600,
+              color: "#1d4ed8",
+              fontSize: "0.92rem",
+            }}>
+              Campos pre-llenados por sugerencia ML
+            </p>
+            <p style={{
+              margin: 0,
+              color: "#3730a3",
+              fontSize: "0.85rem",
+              lineHeight: 1.5,
+            }}>
+              La cantidad y el punto de reorden fueron
+              completados según la predicción. Los precios
+              corresponden a los registrados actualmente —
+              edítalos si han cambiado. Solo necesitas
+              agregar el número de lote y la fecha de
+              vencimiento cuando llegue el pedido.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Lotes */}
       <section className="card">

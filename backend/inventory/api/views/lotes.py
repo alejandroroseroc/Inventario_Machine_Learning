@@ -29,7 +29,7 @@ class LoteListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(producto_id=producto)
         numero_lote = self.request.query_params.get("numero_lote")
         if numero_lote:
-            qs = qs.filter(numero_lote=numero_lote.strip())
+            qs = qs.filter(numero_lote__icontains=numero_lote.strip())
         return qs
 
     def create(self, request, *args, **kwargs):

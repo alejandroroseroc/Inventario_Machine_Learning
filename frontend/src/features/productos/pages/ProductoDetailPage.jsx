@@ -142,7 +142,7 @@ export default function ProductoDetailPage() {
     try {
       const numeroLote = entradaForm.scan?.trim() || null;
       const loteId = await ensureLoteIdInline({
-        numeroLote, fechaCaducidad: entradaForm.fecha_caducidad, codigoBarras: entradaForm.scan || null,
+        numeroLote, fechaCaducidad: entradaForm.fecha_caducidad, codigoBarras: null,
       });
 
       await movimientosService.create({ producto: Number(id), tipo: "entrada", cantidad, lote: loteId });
@@ -388,10 +388,10 @@ export default function ProductoDetailPage() {
         <h3>Lotes</h3>
         <div className="row row--4">
           <div className="col">
-            <label htmlFor="in_scan">Escanear / escribir LOTE</label>
+            <label htmlFor="in_scan">Número de Lote</label>
             <input
               id="in_scan"
-              placeholder="Apunta el lector aquí"
+              placeholder="Ej: ACF2405A (opcional)"
               value={entradaForm.scan}
               onChange={(e) => setEntradaForm((s) => ({ ...s, scan: e.target.value }))}
             />
@@ -416,7 +416,10 @@ export default function ProductoDetailPage() {
             />
           </div>
           <div className="col col--auto" style={{ alignSelf: "end" }}>
-            <button onClick={entradaRapida} className="btn">Agregar stock (auto-lote)</button>
+            <button onClick={entradaRapida} className="btn">Registrar entrada de mercancía</button>
+            <p className="muted" style={{ fontSize: "0.85rem", marginTop: 8 }}>
+              Cuando llegue un pedido: ingresa el <b>número de lote</b> (texto del empaque), la fecha de caducidad y las unidades recibidas.
+            </p>
           </div>
         </div>
 

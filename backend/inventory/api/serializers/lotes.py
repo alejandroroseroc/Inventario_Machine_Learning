@@ -5,11 +5,26 @@ from inventory.models import Lote
 
 class LoteSerializer(serializers.ModelSerializer):
     producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
+    producto_valor_unitario = serializers.DecimalField(
+        source="producto.valor_unitario",
+        max_digits=12, decimal_places=2,
+        read_only=True,
+    )
+    producto_precio_costo = serializers.DecimalField(
+        source="producto.precio_costo",
+        max_digits=12, decimal_places=2,
+        read_only=True,
+    )
     days_left = serializers.SerializerMethodField()
 
     class Meta:
         model = Lote
-        fields = ("id", "producto", "producto_nombre", "numero_lote", "fecha_caducidad", "stock_lote", "fecha_ingreso", "codigo_barras", "days_left", "estado")
+        fields = (
+            "id", "producto", "producto_nombre",
+            "producto_valor_unitario", "producto_precio_costo",
+            "numero_lote", "fecha_caducidad", "stock_lote",
+            "fecha_ingreso", "codigo_barras", "days_left", "estado",
+        )
 
     def get_days_left(self, obj):
         from django.utils import timezone

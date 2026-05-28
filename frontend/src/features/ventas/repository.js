@@ -51,3 +51,36 @@ export async function getHistorialPaginado(year, month, page = 1) {
   if (month) q.set("month", month);
   return http.get(`/inventory/ventas/historial?${q.toString()}`, { auth: true });
 }
+
+export async function getGastosDia(fechaIso) {
+  const qs = fechaIso ? `?fecha=${fechaIso}` : "";
+  return http.get(`/inventory/gastos${qs}`, { auth: true });
+}
+
+export async function crearGasto({ fecha, monto, observacion }) {
+  return http.post("/inventory/gastos", {
+    body: { fecha, monto, observacion },
+    auth: true,
+  });
+}
+
+export async function eliminarGasto(id) {
+  return http.del(`/inventory/gastos/${id}`, { auth: true });
+}
+
+export async function getReporteDiario(fechaIso) {
+  const qs = fechaIso ? `?fecha=${fechaIso}` : "";
+  return http.get(`/inventory/reportes/diario${qs}`, { auth: true });
+}
+
+export async function getReporteSemanal(fechaIso) {
+  const qs = fechaIso ? `?fecha=${fechaIso}` : "";
+  return http.get(`/inventory/reportes/semanal${qs}`, { auth: true });
+}
+
+export async function getReporteMensual(year, month) {
+  return http.get(
+    `/inventory/reportes/mensual?year=${year}&month=${month}`,
+    { auth: true }
+  );
+}

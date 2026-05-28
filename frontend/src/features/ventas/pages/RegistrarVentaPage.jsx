@@ -7,7 +7,13 @@ import {
   getCierreDia,
   getHistorialPaginado,
   listarLotes,
-  listarVentasHoy
+  listarVentasHoy,
+  getGastosDia,
+  crearGasto,
+  eliminarGasto,
+  getReporteDiario,
+  getReporteSemanal,
+  getReporteMensual,
 } from "../repository";
 
 import "../../../styles/ventas.css"; // << importante
@@ -50,6 +56,24 @@ export default function RegistrarVentaPage() {
   const [confirmAnularId, setConfirmAnularId] = useState(null);
   const [cierreResumen, setCierreResumen] = useState(null);
   const [motivoAnulacion, setMotivoAnulacion] = useState("");
+
+  const [tabPrincipal, setTabPrincipal] = useState("ventas");
+
+  // --- Cierre del día ---
+  const [cierreDia, setCierreDia] = useState(null);
+  const [loadingCierre, setLoadingCierre] = useState(false);
+  const [gastoForm, setGastoForm] = useState({ monto: "", observacion: "" });
+  const [guardandoGasto, setGuardandoGasto] = useState(false);
+
+  // --- Cierres anteriores ---
+  const [tabReporte, setTabReporte] = useState("diario");
+  const [fechaBuscar, setFechaBuscar] = useState(new Date().toISOString().split("T")[0]);
+  const [reporteDiario, setReporteDiario] = useState(null);
+  const [reporteSemanal, setReporteSemanal] = useState(null);
+  const [reporteMensual, setReporteMensual] = useState(null);
+  const [loadingReporte, setLoadingReporte] = useState(false);
+  const [yearMes, setYearMes] = useState(new Date().getFullYear());
+  const [mes, setMes] = useState(new Date().getMonth() + 1);
 
   const showNotice = (type, title, message = "") => {
     setNotice({ type, title, message });
@@ -121,6 +145,94 @@ export default function RegistrarVentaPage() {
     } catch { /* noop */ }
   };
 
+  const cargarCierreDia = async (fechaIso) => {
+    setLoadingCierre(true);
+    try {
+      const data = await getReporteDiario(fechaIso);
+      setCierreDia(data);
+    } catch (e) {
+      console.error("Error cargando cierre:", e);
+    } finally {
+      setLoadingCierre(false);
+    }
+  };
+
+  const handleAgregarGasto = async () => {
+    const monto = Number(gastoForm.monto);
+    const obs = gastoForm.observacion.trim();
+    if (!monto || monto <= 0) {
+      showNotice("warning", "Monto inválido", "El monto debe ser mayor a 0.");
+      return;
+    }
+    if (!obs) {
+      showNotice("warning", "Observación requerida", "Debes describir el gasto.");
+      return;
+    }
+    setGuardandoGasto(true);
+    try {
+      await crearGasto({
+        fecha: new Date().toISOString().split("T")[0],
+        monto,
+        observacion: obs,
+      });
+      setGastoForm({ monto: "", observacion: "" });
+      await cargarCierreDia(new Date().toISOString().split("T")[0]);
+      showNotice("success", "Gasto registrado");
+    } catch (e) {
+      showNotice("error", "No se pudo registrar el gasto");
+    } finally {
+      setGuardandoGasto(false);
+    }
+  };
+
+  const handleEliminarGasto = async (gastoId) => {
+    try {
+      await eliminarGasto(gastoId);
+      await cargarCierreDia(new Date().toISOString().split("T")[0]);
+      showNotice("success", "Gasto eliminado");
+    } catch (e) {
+      showNotice("error", "No se pudo eliminar el gasto");
+    }
+  };
+
+  const cargarReporteDiario = async () => {
+    setLoadingReporte(true);
+    try {
+      const data = await getReporteDiario(fechaBuscar);
+      setReporteDiario(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingReporte(false);
+    }
+  };
+
+  const cargarReporteSemanal = async () => {
+    setLoadingReporte(true);
+    try {
+      const data = await getReporteSemanal(fechaBuscar);
+      setReporteSemanal(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingReporte(false);
+    }
+  };
+
+  const cargarReporteMensual = async () => {
+    setLoadingReporte(true);
+    try {
+      const data = await getReporteMensual(yearMes, mes);
+      setReporteMensual(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingReporte(false);
+    }
+  };
+
+  const handlePrintMensual = () => { window.print(); };
+
   const loadHistorial = async () => {
     setLoadingHistorial(true);
     try {
@@ -135,6 +247,11 @@ export default function RegistrarVentaPage() {
 
   useEffect(() => { loadDia(); }, []);
   useEffect(() => { loadHistorial(); }, [histFiltroYear, histFiltroMonth, histPage]);
+  useEffect(() => {
+    if (tabPrincipal === "cierre") {
+      cargarCierreDia(new Date().toISOString().split("T")[0]);
+    }
+  }, [tabPrincipal]);
 
   const selectProduct = async (p, preferLoteId = null) => {
     setProductoSel({ id: p.id, nombre: p.nombre, valor_unitario: Number(p.valor_unitario || 0) });
@@ -299,6 +416,14 @@ export default function RegistrarVentaPage() {
     }, 50);
   };
 
+  const cop = money;
+  const filaStyle = {
+    display: "flex", justifyContent: "space-between",
+    alignItems: "center", padding: "8px 0",
+    borderBottom: "1px solid #f1f5f9", fontSize: "0.95rem",
+  };
+  const tdNum = { padding: "8px 12px", textAlign: "right", fontSize: "0.85rem" };
+
   return (
     <div className="page page--ventas">
       {notice && (
@@ -309,7 +434,35 @@ export default function RegistrarVentaPage() {
         </div>
       )}
 
-      <h1 className="page__title">Ventas</h1>
+      {/* Tabs principales */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e2e8f0" }}>
+        {[
+          { key: "ventas", label: "🛒 Registrar Venta" },
+          { key: "cierre", label: "📊 Cierre del Día" },
+          { key: "historico", label: "📅 Cierres Anteriores" },
+        ].map(t => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTabPrincipal(t.key)}
+            style={{
+              padding: "10px 20px", border: "none",
+              background: "transparent",
+              borderBottom: tabPrincipal === t.key ? "3px solid #2563eb" : "3px solid transparent",
+              color: tabPrincipal === t.key ? "#2563eb" : "#64748b",
+              fontWeight: tabPrincipal === t.key ? 700 : 500,
+              cursor: "pointer", fontSize: "0.95rem",
+              marginBottom: -2,
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tabPrincipal === "ventas" && (
+        <>
+          <h1 className="page__title">Ventas</h1>
 
       {/* BUSCADOR */}
       <div className="card form-scan" role="search">
@@ -685,6 +838,359 @@ export default function RegistrarVentaPage() {
           </div>
         </div>
       )}
+        </>
+      )}
+
+      {tabPrincipal === "cierre" && (
+        <div>
+          <h2 style={{ fontSize: "1.3rem", marginBottom: 20 }}>
+            Cierre del Día — {new Date().toLocaleDateString("es-CO")}
+          </h2>
+
+          {loadingCierre ? (
+            <p>Calculando cierre...</p>
+          ) : cierreDia ? (
+            <>
+              <div className="card" style={{ marginBottom: 16 }}>
+                <h3 style={{ marginTop: 0, color: "#1e293b" }}>📦 Ventas del día</h3>
+                <div style={filaStyle}>
+                  <span>Ventas registradas</span>
+                  <span>{cierreDia.ventas_registradas} ({cierreDia.ventas_anuladas} anuladas)</span>
+                </div>
+                <div style={filaStyle}>
+                  <span>Total ventas</span>
+                  <span style={{ color: "#059669", fontWeight: 700 }}>+${cop(cierreDia.total_ventas)}</span>
+                </div>
+                <div style={filaStyle}>
+                  <span>Costo de lo vendido</span>
+                  <span style={{ color: "#dc2626" }}>-${cop(cierreDia.costo_vendido)}</span>
+                </div>
+                <div style={{ ...filaStyle, borderTop: "2px solid #e2e8f0", paddingTop: 10, fontWeight: 700 }}>
+                  <span>💰 Ganancia bruta</span>
+                  <span style={{ color: cierreDia.ganancia_bruta >= 0 ? "#059669" : "#dc2626" }}>
+                    ${cop(cierreDia.ganancia_bruta)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: 16 }}>
+                <h3 style={{ marginTop: 0, color: "#1e293b" }}>📋 Gastos del día</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "140px 1fr auto", gap: 10, marginBottom: 16 }}>
+                  <input
+                    type="number" min="1" placeholder="Monto $"
+                    value={gastoForm.monto}
+                    onChange={e => setGastoForm(s => ({ ...s, monto: e.target.value }))}
+                    style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1" }}
+                  />
+                  <input
+                    type="text" placeholder="Descripción obligatoria del gasto"
+                    value={gastoForm.observacion}
+                    onChange={e => setGastoForm(s => ({ ...s, observacion: e.target.value }))}
+                    style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1" }}
+                  />
+                  <button type="button" className="btn btn--primary" onClick={handleAgregarGasto} disabled={guardandoGasto}>
+                    {guardandoGasto ? "..." : "+ Agregar"}
+                  </button>
+                </div>
+                {cierreDia.gastos.length === 0 ? (
+                  <p style={{ color: "#94a3b8", margin: "8px 0" }}>Sin gastos registrados hoy</p>
+                ) : (
+                  cierreDia.gastos.map(g => (
+                    <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #f1f5f9" }}>
+                      <div>
+                        <span style={{ fontWeight: 600, color: "#dc2626" }}>-${cop(g.monto)}</span>
+                        <span style={{ color: "#475569", marginLeft: 12, fontSize: "0.9rem" }}>{g.observacion}</span>
+                      </div>
+                      <button type="button" className="link-danger" style={{ fontSize: "0.8rem" }} onClick={() => handleEliminarGasto(g.id)}>
+                        Eliminar
+                      </button>
+                    </div>
+                  ))
+                )}
+                <div style={{ ...filaStyle, borderTop: "2px solid #e2e8f0", paddingTop: 10, fontWeight: 700, marginTop: 8 }}>
+                  <span>Total gastos</span>
+                  <span style={{ color: "#dc2626" }}>-${cop(cierreDia.total_gastos)}</span>
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: 16, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                <div style={{ ...filaStyle, fontWeight: 700, fontSize: "1.1rem" }}>
+                  <span>💵 Ganancia neta</span>
+                  <span style={{ color: cierreDia.ganancia_neta >= 0 ? "#059669" : "#dc2626" }}>
+                    ${cop(cierreDia.ganancia_neta)}
+                  </span>
+                </div>
+              </div>
+
+              {(cierreDia.perdida_vencidos > 0 || cierreDia.perdida_devoluciones > 0) && (
+                <div className="card" style={{ marginBottom: 16, background: "#fff7ed", border: "1px solid #fed7aa" }}>
+                  <h3 style={{ marginTop: 0, color: "#92400e" }}>⚠️ Pérdidas del día</h3>
+                  {cierreDia.perdida_vencidos > 0 && (
+                    <div style={filaStyle}>
+                      <span>Medicamentos vencidos (baja)</span>
+                      <span style={{ color: "#dc2626" }}>-${cop(cierreDia.perdida_vencidos)}</span>
+                    </div>
+                  )}
+                  {cierreDia.perdida_devoluciones > 0 && (
+                    <div style={filaStyle}>
+                      <span>Devoluciones proveedor (50%)</span>
+                      <span style={{ color: "#d97706" }}>-${cop(cierreDia.perdida_devoluciones)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="card" style={{ background: cierreDia.resultado_final >= 0 ? "#f0fdf4" : "#fef2f2", border: `1px solid ${cierreDia.resultado_final >= 0 ? "#bbf7d0" : "#fecaca"}` }}>
+                <div style={{ ...filaStyle, fontWeight: 700, fontSize: "1.3rem" }}>
+                  <span>🏁 Resultado final del día</span>
+                  <span style={{ color: cierreDia.resultado_final >= 0 ? "#059669" : "#dc2626" }}>
+                    ${cop(cierreDia.resultado_final)}
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p>No se pudo cargar el cierre.</p>
+          )}
+        </div>
+      )}
+
+      {tabPrincipal === "historico" && (
+        <div>
+          <h2 style={{ fontSize: "1.3rem", marginBottom: 16 }}>Cierres Anteriores</h2>
+
+          <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "2px solid #e2e8f0" }}>
+            {[
+              { key: "diario", label: "Diario" },
+              { key: "semanal", label: "Semanal" },
+              { key: "mensual", label: "Mensual" },
+            ].map(t => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTabReporte(t.key)}
+                style={{
+                  padding: "8px 18px", border: "none", background: "transparent",
+                  borderBottom: tabReporte === t.key ? "3px solid #2563eb" : "3px solid transparent",
+                  color: tabReporte === t.key ? "#2563eb" : "#64748b",
+                  fontWeight: tabReporte === t.key ? 700 : 500,
+                  cursor: "pointer", marginBottom: -2,
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {tabReporte === "diario" && (
+            <div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
+                <input
+                  type="date" value={fechaBuscar}
+                  onChange={e => setFechaBuscar(e.target.value)}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}
+                />
+                <button type="button" className="btn btn--primary" onClick={cargarReporteDiario} disabled={loadingReporte}>
+                  {loadingReporte ? "Cargando..." : "Ver cierre"}
+                </button>
+              </div>
+              {reporteDiario && <ReporteCierreDetalle data={reporteDiario} cop={cop} filaStyle={filaStyle} />}
+            </div>
+          )}
+
+          {tabReporte === "semanal" && (
+            <div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
+                <label style={{ color: "#475569", fontSize: "0.9rem" }}>Selecciona cualquier día de la semana:</label>
+                <input
+                  type="date" value={fechaBuscar}
+                  onChange={e => setFechaBuscar(e.target.value)}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}
+                />
+                <button type="button" className="btn btn--primary" onClick={cargarReporteSemanal} disabled={loadingReporte}>
+                  {loadingReporte ? "Cargando..." : "Ver semana"}
+                </button>
+              </div>
+              {reporteSemanal && (
+                <div>
+                  <p style={{ color: "#475569", marginBottom: 12 }}>
+                    Semana del {reporteSemanal.semana_inicio} al {reporteSemanal.semana_fin}
+                  </p>
+                  <div className="card">
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ background: "#f8fafc" }}>
+                          {["DÍA","VENTAS","COSTO","G. BRUTA","GASTOS","G. NETA","PÉRDIDAS","RESULTADO"].map(h => (
+                            <th key={h} style={{ padding: "10px 12px", textAlign: h === "DÍA" ? "left" : "right", fontSize: "0.78rem", color: "#475569", borderBottom: "2px solid #e2e8f0" }}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reporteSemanal.dias.map((d, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid #f1f5f9", background: d.total_ventas === 0 ? "#fafafa" : "white" }}>
+                            <td style={{ padding: "8px 12px", fontSize: "0.88rem" }}>
+                              <div style={{ fontWeight: 600 }}>{d.nombre_dia}</div>
+                              <div style={{ color: "#94a3b8", fontSize: "0.75rem" }}>{d.fecha}</div>
+                            </td>
+                            <td style={tdNum}>${cop(d.total_ventas)}</td>
+                            <td style={{ ...tdNum, color: "#dc2626" }}>-${cop(d.costo_vendido)}</td>
+                            <td style={{ ...tdNum, color: "#059669" }}>${cop(d.ganancia_bruta)}</td>
+                            <td style={{ ...tdNum, color: "#dc2626" }}>{d.total_gastos > 0 ? `-$${cop(d.total_gastos)}` : "-"}</td>
+                            <td style={{ ...tdNum, fontWeight: 600, color: d.ganancia_neta >= 0 ? "#059669" : "#dc2626" }}>${cop(d.ganancia_neta)}</td>
+                            <td style={{ ...tdNum, color: "#d97706" }}>{d.total_perdidas > 0 ? `-$${cop(d.total_perdidas)}` : "-"}</td>
+                            <td style={{ ...tdNum, fontWeight: 700, color: d.resultado_final >= 0 ? "#059669" : "#dc2626" }}>${cop(d.resultado_final)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ background: "#f0fdf4" }}>
+                          <td style={{ padding: "10px 12px", fontWeight: 700 }}>TOTAL SEMANA</td>
+                          <td style={tdNum}>${cop(reporteSemanal.totales.total_ventas)}</td>
+                          <td style={{ ...tdNum, color: "#dc2626" }}>-${cop(reporteSemanal.totales.costo_vendido)}</td>
+                          <td style={{ ...tdNum, color: "#059669" }}>${cop(reporteSemanal.totales.ganancia_bruta)}</td>
+                          <td style={{ ...tdNum, color: "#dc2626" }}>-${cop(reporteSemanal.totales.total_gastos)}</td>
+                          <td style={{ ...tdNum, fontWeight: 700, color: "#059669" }}>${cop(reporteSemanal.totales.ganancia_neta)}</td>
+                          <td style={{ ...tdNum, color: "#d97706" }}>-${cop(reporteSemanal.totales.total_perdidas)}</td>
+                          <td style={{ ...tdNum, fontWeight: 700, color: reporteSemanal.totales.resultado_final >= 0 ? "#059669" : "#dc2626" }}>${cop(reporteSemanal.totales.resultado_final)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tabReporte === "mensual" && (
+            <div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+                <select value={yearMes} onChange={e => setYearMes(Number(e.target.value))} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}>
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <select value={mes} onChange={e => setMes(Number(e.target.value))} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}>
+                  {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => (
+                    <option key={i+1} value={i+1}>{m}</option>
+                  ))}
+                </select>
+                <button type="button" className="btn btn--primary" onClick={cargarReporteMensual} disabled={loadingReporte}>
+                  {loadingReporte ? "Cargando..." : "Ver mes"}
+                </button>
+                {reporteMensual && (
+                  <button type="button" className="btn" onClick={handlePrintMensual} style={{ background: "#7c3aed", color: "#fff", border: "none" }}>
+                    📄 Exportar PDF
+                  </button>
+                )}
+              </div>
+
+              {reporteMensual && (
+                <div className="print-section">
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <h3 style={{ marginTop: 0 }} className="no-print">Resumen del mes</h3>
+                    <p style={{ fontWeight: 700, fontSize: "1.1rem", marginBottom: 16 }}>
+                      {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][mes - 1]} {yearMes}
+                    </p>
+                    <div style={filaStyle}><span>📦 Total ventas</span><span style={{ color: "#059669", fontWeight: 600 }}>+${cop(reporteMensual.totales.total_ventas)}</span></div>
+                    <div style={filaStyle}><span>Costo de lo vendido</span><span style={{ color: "#dc2626" }}>-${cop(reporteMensual.totales.costo_vendido)}</span></div>
+                    <div style={{ ...filaStyle, borderTop: "1px solid #e2e8f0", paddingTop: 8, fontWeight: 600 }}><span>💰 Ganancia bruta</span><span style={{ color: "#059669" }}>${cop(reporteMensual.totales.ganancia_bruta)}</span></div>
+                    <div style={filaStyle}><span>📋 Total gastos</span><span style={{ color: "#dc2626" }}>-${cop(reporteMensual.totales.total_gastos)}</span></div>
+                    <div style={{ ...filaStyle, borderTop: "1px solid #e2e8f0", paddingTop: 8, fontWeight: 600 }}><span>💵 Ganancia neta</span><span style={{ color: reporteMensual.totales.ganancia_neta >= 0 ? "#059669" : "#dc2626" }}>${cop(reporteMensual.totales.ganancia_neta)}</span></div>
+                    <div style={filaStyle}><span>⚠️ Pérdidas vencidos</span><span style={{ color: "#dc2626" }}>-${cop(reporteMensual.totales.perdida_vencidos)}</span></div>
+                    <div style={filaStyle}><span>⚠️ Pérdidas devoluciones (50%)</span><span style={{ color: "#d97706" }}>-${cop(reporteMensual.totales.perdida_devoluciones)}</span></div>
+                    <div style={{ ...filaStyle, borderTop: "2px solid #1e293b", paddingTop: 10, fontWeight: 700, fontSize: "1.15rem" }}>
+                      <span>🏁 Resultado final del mes</span>
+                      <span style={{ color: reporteMensual.totales.resultado_final >= 0 ? "#059669" : "#dc2626" }}>
+                        ${cop(reporteMensual.totales.resultado_final)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {reporteMensual.gastos_detalle.length > 0 && (
+                    <div className="card">
+                      <h4 style={{ marginTop: 0 }}>Detalle de gastos del mes</h4>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr>
+                            {["FECHA","OBSERVACIÓN","MONTO"].map(h => (
+                              <th key={h} style={{ padding: "8px 12px", textAlign: h === "MONTO" ? "right" : "left", fontSize: "0.78rem", color: "#475569", borderBottom: "2px solid #e2e8f0" }}>
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reporteMensual.gastos_detalle.map(g => (
+                            <tr key={g.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                              <td style={{ padding: "7px 12px", fontSize: "0.85rem", color: "#475569" }}>{g.fecha}</td>
+                              <td style={{ padding: "7px 12px", fontSize: "0.88rem" }}>{g.observacion}</td>
+                              <td style={{ padding: "7px 12px", textAlign: "right", fontWeight: 600, color: "#dc2626" }}>-${cop(g.monto)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReporteCierreDetalle({ data, cop, filaStyle }) {
+  return (
+    <div>
+      <p style={{ color: "#475569", marginBottom: 12 }}>Cierre del {data.fecha}</p>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={filaStyle}>
+          <span>Ventas ({data.ventas_registradas} registradas, {data.ventas_anuladas} anuladas)</span>
+          <span style={{ color: "#059669", fontWeight: 600 }}>+${cop(data.total_ventas)}</span>
+        </div>
+        <div style={filaStyle}>
+          <span>Costo vendido</span>
+          <span style={{ color: "#dc2626" }}>-${cop(data.costo_vendido)}</span>
+        </div>
+        <div style={{ ...filaStyle, fontWeight: 700, borderTop: "1px solid #e2e8f0", paddingTop: 8 }}>
+          <span>💰 Ganancia bruta</span>
+          <span style={{ color: "#059669" }}>${cop(data.ganancia_bruta)}</span>
+        </div>
+        <div style={filaStyle}>
+          <span>Gastos del día</span>
+          <span style={{ color: "#dc2626" }}>-${cop(data.total_gastos)}</span>
+        </div>
+        {data.gastos.length > 0 && data.gastos.map(g => (
+          <div key={g.id} style={{ ...filaStyle, paddingLeft: 16, fontSize: "0.82rem", color: "#64748b" }}>
+            <span>{g.observacion}</span>
+            <span>-${cop(g.monto)}</span>
+          </div>
+        ))}
+        <div style={{ ...filaStyle, fontWeight: 700, borderTop: "1px solid #e2e8f0", paddingTop: 8 }}>
+          <span>💵 Ganancia neta</span>
+          <span style={{ color: data.ganancia_neta >= 0 ? "#059669" : "#dc2626" }}>${cop(data.ganancia_neta)}</span>
+        </div>
+        {data.total_perdidas > 0 && (
+          <>
+            <div style={{ ...filaStyle, color: "#dc2626" }}>
+              <span>Vencidos</span>
+              <span>-${cop(data.perdida_vencidos)}</span>
+            </div>
+            <div style={{ ...filaStyle, color: "#d97706" }}>
+              <span>Devoluciones (50%)</span>
+              <span>-${cop(data.perdida_devoluciones)}</span>
+            </div>
+          </>
+        )}
+        <div style={{ ...filaStyle, fontWeight: 700, fontSize: "1.1rem", borderTop: "2px solid #1e293b", paddingTop: 10 }}>
+          <span>🏁 Resultado final</span>
+          <span style={{ color: data.resultado_final >= 0 ? "#059669" : "#dc2626" }}>${cop(data.resultado_final)}</span>
+        </div>
+      </div>
     </div>
   );
 }

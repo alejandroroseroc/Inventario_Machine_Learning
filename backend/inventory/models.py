@@ -131,3 +131,27 @@ class VentaItem(models.Model):
 
     def __str__(self):
         return f"VentaItem v{self.venta_id} p{self.producto_id} x{self.cantidad}"
+
+
+class GastoDia(models.Model):
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="gastos_dia"
+    )
+    fecha = models.DateField()
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    observacion = models.CharField(
+        max_length=300,
+        help_text="Descripción obligatoria del gasto"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["usuario", "fecha"]),
+        ]
+
+    def __str__(self):
+        return f"Gasto {self.fecha} ${self.monto} - {self.observacion[:40]}"

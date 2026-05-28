@@ -28,6 +28,11 @@ from .api.views import (
     MarcarVencidosAutoView,
     LotesVencidosListView,
     LotesDevolucionListView,
+    GastoDiaListCreateView,
+    GastoDiaDeleteView,
+    ReporteDiarioView,
+    ReporteSemanalView,
+    ReporteMensualView,
 )
 
 
@@ -71,4 +76,13 @@ urlpatterns = [
 
     # Imports
     path("inventory/import-csv", CSVImportView.as_view(), name="import-csv"),
+
+    # Gastos
+    path("inventory/gastos", GastoDiaListCreateView.as_view(), name="gastos-list-create"),
+    path("inventory/gastos/<int:pk>", GastoDiaDeleteView.as_view(), name="gastos-delete"),
+
+    # Reportes
+    path("inventory/reportes/diario", ReporteDiarioView.as_view(), name="reporte-diario"),
+    path("inventory/reportes/semanal", ReporteSemanalView.as_view(), name="reporte-semanal"),
+    path("inventory/reportes/mensual", ReporteMensualView.as_view(), name="reporte-mensual"),
 ]

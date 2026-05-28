@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import "../../../styles/productos.css";
 import { lotesService } from "../../lotes/service";
 import { movimientosService } from "../../movimientos/service";
-import { patchProducto, sugerirRop } from "../repository";
+import { desactivarProducto, patchProducto, sugerirRop } from "../repository";
 import { productoService } from "../service";
 
 export default function ProductoDetailPage() {
@@ -27,6 +27,8 @@ export default function ProductoDetailPage() {
   const [ss, setSs] = useState(0);
   const [sugerencia, setSugerencia] = useState(null);
   const [calculando, setCalculando] = useState(false);
+
+  const [mostrarOpcionDesactivar, setMostrarOpcionDesactivar] = useState(false);
 
   const [form, setForm] = useState({
     codigo: "", nombre: "", categoria: "C", punto_reorden: 0, valor_unitario: 0,
@@ -110,11 +112,35 @@ export default function ProductoDetailPage() {
   };
 
   const remove = async () => {
-    if (!confirm("¿Eliminar este producto? Esta acción es irreversible.")) return;
+    if (!confirm(
+      "¿Eliminar este medicamento? " +
+      "Si tiene ventas o movimientos registrados, " +
+      "se ofrecerá desactivarlo."
+    )) return;
+
     setRemoving(true);
-    try { await productoService.remove(id); navigate("/productos"); }
-    catch { alert("No se pudo eliminar"); }
-    finally { setRemoving(false); }
+    try {
+      await productoService.remove(id);
+      navigate("/productos");
+    } catch (e) {
+      if (e?.status === 409 || e?.response?.status === 409
+          || (e?.payload && e.payload.puede_desactivar)) {
+        setMostrarOpcionDesactivar(true);
+      } else {
+        alert("No se pudo eliminar el medicamento.");
+      }
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const handleDesactivar = async () => {
+    try {
+      await desactivarProducto(id);
+      navigate("/productos");
+    } catch {
+      alert("No se pudo desactivar el medicamento.");
+    }
   };
 
   const ensureLoteIdInline = async ({ numeroLote, fechaCaducidad, codigoBarras }) => {
@@ -214,6 +240,39 @@ export default function ProductoDetailPage() {
           <button onClick={remove} disabled={removing} className="btn btn--danger">{removing ? "Eliminando..." : "Eliminar"}</button>
         </div>
       </div>
+
+      {mostrarOpcionDesactivar && (
+        <div style={{
+          background: "#fff7ed",
+          border: "1px solid #fed7aa",
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 16,
+        }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 600, color: "#92400e" }}>
+            ⚠️ Este medicamento tiene ventas o movimientos registrados y no puede eliminarse definitivamente.
+          </p>
+          <p style={{ margin: "0 0 16px", color: "#78350f", fontSize: "0.9rem" }}>
+            Puede <strong>desactivarlo</strong>: dejará de aparecer en el inventario y en ventas,
+            pero el historial se conserva. Podrá reactivarlo cuando lo necesite.
+          </p>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              className="btn"
+              onClick={() => setMostrarOpcionDesactivar(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              className="btn"
+              style={{ background: "#f97316", color: "#fff", border: "none" }}
+              onClick={handleDesactivar}
+            >
+              Desactivar medicamento
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Edición del producto */}
       <section className="card" aria-labelledby="sec_edit_title">

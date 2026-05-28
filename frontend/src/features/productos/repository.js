@@ -41,3 +41,15 @@ export async function sugerirRop(productoId, { lookback = 90, lead_time = 5, ss 
 export async function patchProducto(id, partial) {
   return http.patch(`${BASE}/${id}`, { body: partial, auth: true });
 }
+
+export async function desactivarProducto(id) {
+  return http.post(`${BASE}/${id}/desactivar`, { auth: true });
+}
+
+export async function reactivarProducto(id) {
+  return http.post(`${BASE}/${id}/reactivar`, { auth: true });
+}
+
+export async function getProductosInactivos() {
+  return http.get(`${BASE}/inactivos`, { auth: true });
+}

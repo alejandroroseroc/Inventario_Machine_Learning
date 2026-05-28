@@ -8,6 +8,9 @@ from .api.views import (
     ProductoForecastView,
     ProductoRopSugerirView,
     ProductoForecastDailyView,
+    ProductoDesactivarView,
+    ProductoReactivarView,
+    ProductoInactivosListView,
     LoteListCreateView,
     LotesPorVencerView,
     MovimientoListCreateView,
@@ -33,11 +36,14 @@ urlpatterns = [
 
     # Productos
     path("inventory/productos", ProductoListCreateView.as_view(), name="productos"),
-    path("inventory/productos/<int:pk>", ProductoDetailView.as_view(), name="producto-detail"),
     path("inventory/productos/recalcular", RecalcularProductosView.as_view(), name="productos-recalcular"),
+    path("inventory/productos/inactivos", ProductoInactivosListView.as_view(), name="productos-inactivos"),
+    path("inventory/productos/<int:pk>", ProductoDetailView.as_view(), name="producto-detail"),
     path("inventory/productos/<int:pk>/forecast", ProductoForecastView.as_view(), name="producto-forecast"),
     path("inventory/productos/<int:pk>/forecast_daily", ProductoForecastDailyView.as_view(), name="producto-forecast-daily"),
     path("inventory/productos/<int:pk>/rop_sugerir", ProductoRopSugerirView.as_view(), name="producto-rop-sugerir"),
+    path("inventory/productos/<int:pk>/desactivar", ProductoDesactivarView.as_view(), name="producto-desactivar"),
+    path("inventory/productos/<int:pk>/reactivar", ProductoReactivarView.as_view(), name="producto-reactivar"),
 
     # Lotes
     path("inventory/lotes", LoteListCreateView.as_view(), name="lotes-list-create"),

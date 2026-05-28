@@ -26,6 +26,12 @@ from .lotes_estado import (
     LotesVencidosListView,
     LotesDevolucionListView,
 )
+from .gastos import GastoDiaListCreateView, GastoDiaDeleteView
+from .reportes import (
+    ReporteDiarioView,
+    ReporteSemanalView,
+    ReporteMensualView,
+)
 
 __all__ = [
     # Productos
@@ -64,5 +70,12 @@ __all__ = [
     "MarcarVencidosAutoView",
     "LotesVencidosListView",
     "LotesDevolucionListView",
+    # Gastos
+    "GastoDiaListCreateView",
+    "GastoDiaDeleteView",
+    # Reportes
+    "ReporteDiarioView",
+    "ReporteSemanalView",
+    "ReporteMensualView",
 ]
 

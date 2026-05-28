@@ -1,4 +1,5 @@
 from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
@@ -26,7 +27,7 @@ class ProductoListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Producto.objects.filter(usuario=self.request.user).order_by("id")
+        qs = Producto.objects.filter(usuario=self.request.user, activo=True).order_by("id")
         term = self.request.query_params.get("search") or self.request.query_params.get("q")
         if term:
             t = term.strip()
@@ -86,7 +87,24 @@ class ProductoDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Producto.objects.filter(usuario=self.request.user)
+        return Producto.objects.filter(usuario=self.request.user, activo=True)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {
+                    "detail": (
+                        "Este medicamento tiene ventas o movimientos "
+                        "registrados y no puede eliminarse. Puede "
+                        "desactivarlo para que no aparezca en ventas "
+                        "ni inventario, conservando el historial."
+                    ),
+                    "puede_desactivar": True,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
 
 class ProductoForecastView(APIView):
@@ -221,3 +239,65 @@ class ProductoRopSugerirView(APIView):
             ),
         }
         return Response(data, status=status.HTTP_200_OK)
+
+
+class ProductoDesactivarView(APIView):
+    """
+    POST /api/inventory/productos/<pk>/desactivar
+    Desactiva un producto con historial.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            producto = Producto.objects.get(id=pk, usuario=request.user)
+        except Producto.DoesNotExist:
+            return Response(
+                {"detail": "Producto no encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        producto.activo = False
+        producto.save(update_fields=["activo"])
+        return Response(
+            {"detail": f"{producto.nombre} desactivado correctamente."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ProductoReactivarView(APIView):
+    """
+    POST /api/inventory/productos/<pk>/reactivar
+    Reactiva un producto desactivado.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            producto = Producto.objects.get(id=pk, usuario=request.user)
+        except Producto.DoesNotExist:
+            return Response(
+                {"detail": "Producto no encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        producto.activo = True
+        producto.save(update_fields=["activo"])
+        return Response(
+            {"detail": f"{producto.nombre} reactivado correctamente."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ProductoInactivosListView(APIView):
+    """
+    GET /api/inventory/productos/inactivos
+    Lista productos desactivados del usuario.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = Producto.objects.filter(
+            usuario=request.user,
+            activo=False
+        ).order_by("nombre")
+        ser = ProductoSerializer(qs, many=True)
+        return Response(ser.data)

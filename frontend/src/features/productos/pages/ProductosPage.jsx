@@ -7,6 +7,7 @@ import { FileUp, ArrowLeft, Search } from "lucide-react";
 import { importarCSV } from "../importService";
 import { productoCreate, productosList } from "../service";
 import { marcarVencidosAuto, listLotesVencidos, listLotesDevoluciones } from "../../lotes/repository";
+import { getProductosInactivos, reactivarProducto } from "../repository";
 
 export default function ProductosPage() {
   const [items, setItems] = useState([]);
@@ -23,6 +24,8 @@ export default function ProductosPage() {
   const [lotesVencidos, setLotesVencidos] = useState([]);
   const [lotesDevoluciones, setLotesDevoluciones] = useState([]);
   const [loadingListas, setLoadingListas] = useState(false);
+  const [inactivos, setInactivos] = useState([]);
+  const [loadingInactivos, setLoadingInactivos] = useState(false);
 
   // Estilos de tabla compartidos
   const thStyle = {
@@ -59,9 +62,22 @@ export default function ProductosPage() {
     }
   }
 
+  async function loadInactivos() {
+    setLoadingInactivos(true);
+    try {
+      const data = await getProductosInactivos();
+      setInactivos(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Error cargando inactivos:", e);
+    } finally {
+      setLoadingInactivos(false);
+    }
+  }
+
   useEffect(() => {
     load();
     loadListasEspeciales();
+    loadInactivos();
   }, []);
 
   async function handleCreate(form) {
@@ -143,6 +159,10 @@ export default function ProductosPage() {
           {
             key: "devoluciones",
             label: `🟡 Devoluciones${lotesDevoluciones.length > 0 ? ` (${lotesDevoluciones.length})` : ""}`,
+          },
+          {
+            key: "inactivos",
+            label: `⚫ Inactivos${inactivos.length > 0 ? ` (${inactivos.length})` : ""}`,
           },
         ].map((t) => (
           <button
@@ -302,6 +322,69 @@ export default function ProductosPage() {
                     </td>
                   </tr>
                 )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+      {/* ── Pestaña Inactivos ── */}
+      {tabInventario === "inactivos" && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <h3 style={{ color: "#374151", marginTop: 0 }}>⚫ Medicamentos Inactivos</h3>
+          <p style={{ color: "#64748b", fontSize: "0.9rem" }}>
+            Estos medicamentos fueron desactivados. No aparecen en ventas ni en el inventario activo.
+            Puedes reactivarlos cuando lo necesites.
+          </p>
+          {loadingInactivos ? <p>Cargando...</p> : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f1f5f9" }}>
+                  <th style={thStyle}>MEDICAMENTO</th>
+                  <th style={thStyle}>CÓDIGO</th>
+                  <th style={thStyle}>CATEGORÍA</th>
+                  <th style={thStyle}>PRECIO VENTA</th>
+                  <th style={thStyle}>ACCIÓN</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inactivos.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: "center", padding: 24, color: "#94a3b8" }}>
+                      No hay medicamentos inactivos
+                    </td>
+                  </tr>
+                ) : inactivos.map(p => (
+                  <tr key={p.id} style={{ borderBottom: "1px solid #e2e8f0", opacity: 0.75 }}>
+                    <td style={tdStyle}>{p.nombre}</td>
+                    <td style={tdStyle}>{p.codigo}</td>
+                    <td style={tdStyle}>{p.categoria}</td>
+                    <td style={tdStyle}>
+                      ${Number(p.valor_unitario || 0).toLocaleString("es-CO")}
+                    </td>
+                    <td style={tdStyle}>
+                      <button
+                        className="btn"
+                        style={{
+                          background: "#059669",
+                          color: "#fff",
+                          border: "none",
+                          fontSize: "0.85rem",
+                          padding: "6px 14px",
+                        }}
+                        onClick={async () => {
+                          try {
+                            await reactivarProducto(p.id);
+                            await Promise.all([load(), loadInactivos()]);
+                          } catch {
+                            alert("No se pudo reactivar.");
+                          }
+                        }}
+                      >
+                        Reactivar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}

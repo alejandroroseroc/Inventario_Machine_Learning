@@ -25,6 +25,11 @@ class Producto(models.Model):
         help_text="Porcentaje de ganancia (ej: 15 = 15%)"
     )
     codigo_barras = models.CharField(max_length=32, blank=True, null=True)
+    activo = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="False = medicamento desactivado, conserva historial"
+    )
 
     class Meta:
         # El código es único solo para cada usuario

@@ -437,9 +437,9 @@ export default function RegistrarVentaPage() {
       {/* Tabs principales */}
       <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e2e8f0" }}>
         {[
-          { key: "ventas", label: "🛒 Registrar Venta" },
-          { key: "cierre", label: "📊 Cierre del Día" },
-          { key: "historico", label: "📅 Cierres Anteriores" },
+          { key: "ventas", label: "Registrar Venta" },
+          { key: "cierre", label: "Cierre del Día" },
+          { key: "historico", label: "Cierres Anteriores" },
         ].map(t => (
           <button
             key={t.key}
@@ -852,7 +852,7 @@ export default function RegistrarVentaPage() {
           ) : cierreDia ? (
             <>
               <div className="card" style={{ marginBottom: 16 }}>
-                <h3 style={{ marginTop: 0, color: "#1e293b" }}>📦 Ventas del día</h3>
+                <h3 style={{ marginTop: 0, color: "#1e293b" }}>Ventas del día</h3>
                 <div style={filaStyle}>
                   <span>Ventas registradas</span>
                   <span>{cierreDia.ventas_registradas} ({cierreDia.ventas_anuladas} anuladas)</span>
@@ -866,7 +866,7 @@ export default function RegistrarVentaPage() {
                   <span style={{ color: "#dc2626" }}>-${cop(cierreDia.costo_vendido)}</span>
                 </div>
                 <div style={{ ...filaStyle, borderTop: "2px solid #e2e8f0", paddingTop: 10, fontWeight: 700 }}>
-                  <span>💰 Ganancia bruta</span>
+                  <span>Ganancia bruta</span>
                   <span style={{ color: cierreDia.ganancia_bruta >= 0 ? "#059669" : "#dc2626" }}>
                     ${cop(cierreDia.ganancia_bruta)}
                   </span>
@@ -874,7 +874,7 @@ export default function RegistrarVentaPage() {
               </div>
 
               <div className="card" style={{ marginBottom: 16 }}>
-                <h3 style={{ marginTop: 0, color: "#1e293b" }}>📋 Gastos del día</h3>
+                <h3 style={{ marginTop: 0, color: "#1e293b" }}>Gastos del día</h3>
                 <div style={{ display: "grid", gridTemplateColumns: "140px 1fr auto", gap: 10, marginBottom: 16 }}>
                   <input
                     type="number" min="1" placeholder="Monto $"
@@ -915,7 +915,7 @@ export default function RegistrarVentaPage() {
 
               <div className="card" style={{ marginBottom: 16, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
                 <div style={{ ...filaStyle, fontWeight: 700, fontSize: "1.1rem" }}>
-                  <span>💵 Ganancia neta</span>
+                  <span>Ganancia neta</span>
                   <span style={{ color: cierreDia.ganancia_neta >= 0 ? "#059669" : "#dc2626" }}>
                     ${cop(cierreDia.ganancia_neta)}
                   </span>
@@ -924,7 +924,7 @@ export default function RegistrarVentaPage() {
 
               {(cierreDia.perdida_vencidos > 0 || cierreDia.perdida_devoluciones > 0) && (
                 <div className="card" style={{ marginBottom: 16, background: "#fff7ed", border: "1px solid #fed7aa" }}>
-                  <h3 style={{ marginTop: 0, color: "#92400e" }}>⚠️ Pérdidas del día</h3>
+                  <h3 style={{ marginTop: 0, color: "#92400e" }}>Pérdidas del día</h3>
                   {cierreDia.perdida_vencidos > 0 && (
                     <div style={filaStyle}>
                       <span>Medicamentos vencidos (baja)</span>
@@ -942,7 +942,7 @@ export default function RegistrarVentaPage() {
 
               <div className="card" style={{ background: cierreDia.resultado_final >= 0 ? "#f0fdf4" : "#fef2f2", border: `1px solid ${cierreDia.resultado_final >= 0 ? "#bbf7d0" : "#fecaca"}` }}>
                 <div style={{ ...filaStyle, fontWeight: 700, fontSize: "1.3rem" }}>
-                  <span>🏁 Resultado final del día</span>
+                  <span>Resultado final del día</span>
                   <span style={{ color: cierreDia.resultado_final >= 0 ? "#059669" : "#dc2626" }}>
                     ${cop(cierreDia.resultado_final)}
                   </span>
@@ -1081,27 +1081,42 @@ export default function RegistrarVentaPage() {
                 </button>
                 {reporteMensual && (
                   <button type="button" className="btn" onClick={handlePrintMensual} style={{ background: "#7c3aed", color: "#fff", border: "none" }}>
-                    📄 Exportar PDF
+                    Exportar PDF
                   </button>
                 )}
               </div>
 
               {reporteMensual && (
                 <div className="print-section">
+                  <div className="print-only" style={{ marginBottom: 24, borderBottom: "2px solid #111", paddingBottom: 16 }}>
+                    <h2 style={{ margin: 0, fontSize: "1.4rem", fontFamily: "Georgia, serif" }}>
+                      Droguería Niza I
+                    </h2>
+                    <p style={{ margin: "4px 0 0", fontSize: "0.9rem", color: "#333" }}>
+                      Reporte mensual de resultados
+                    </p>
+                    <p style={{ margin: "2px 0 0", fontSize: "0.85rem", color: "#333" }}>
+                      {["Enero","Febrero","Marzo","Abril","Mayo","Junio",
+                        "Julio","Agosto","Septiembre","Octubre",
+                        "Noviembre","Diciembre"][mes - 1]} {yearMes}
+                      {" — "}Generado el{" "}
+                      {new Date().toLocaleDateString("es-CO")}
+                    </p>
+                  </div>
                   <div className="card" style={{ marginBottom: 16 }}>
                     <h3 style={{ marginTop: 0 }} className="no-print">Resumen del mes</h3>
                     <p style={{ fontWeight: 700, fontSize: "1.1rem", marginBottom: 16 }}>
                       {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][mes - 1]} {yearMes}
                     </p>
-                    <div style={filaStyle}><span>📦 Total ventas</span><span style={{ color: "#059669", fontWeight: 600 }}>+${cop(reporteMensual.totales.total_ventas)}</span></div>
+                    <div style={filaStyle}><span>Total ventas</span><span style={{ color: "#059669", fontWeight: 600 }}>+${cop(reporteMensual.totales.total_ventas)}</span></div>
                     <div style={filaStyle}><span>Costo de lo vendido</span><span style={{ color: "#dc2626" }}>-${cop(reporteMensual.totales.costo_vendido)}</span></div>
-                    <div style={{ ...filaStyle, borderTop: "1px solid #e2e8f0", paddingTop: 8, fontWeight: 600 }}><span>💰 Ganancia bruta</span><span style={{ color: "#059669" }}>${cop(reporteMensual.totales.ganancia_bruta)}</span></div>
-                    <div style={filaStyle}><span>📋 Total gastos</span><span style={{ color: "#dc2626" }}>-${cop(reporteMensual.totales.total_gastos)}</span></div>
-                    <div style={{ ...filaStyle, borderTop: "1px solid #e2e8f0", paddingTop: 8, fontWeight: 600 }}><span>💵 Ganancia neta</span><span style={{ color: reporteMensual.totales.ganancia_neta >= 0 ? "#059669" : "#dc2626" }}>${cop(reporteMensual.totales.ganancia_neta)}</span></div>
-                    <div style={filaStyle}><span>⚠️ Pérdidas vencidos</span><span style={{ color: "#dc2626" }}>-${cop(reporteMensual.totales.perdida_vencidos)}</span></div>
-                    <div style={filaStyle}><span>⚠️ Pérdidas devoluciones (50%)</span><span style={{ color: "#d97706" }}>-${cop(reporteMensual.totales.perdida_devoluciones)}</span></div>
+                    <div style={{ ...filaStyle, borderTop: "1px solid #e2e8f0", paddingTop: 8, fontWeight: 600 }}><span>Ganancia bruta</span><span style={{ color: "#059669" }}>${cop(reporteMensual.totales.ganancia_bruta)}</span></div>
+                    <div style={filaStyle}><span>Total gastos</span><span style={{ color: "#dc2626" }}>-${cop(reporteMensual.totales.total_gastos)}</span></div>
+                    <div style={{ ...filaStyle, borderTop: "1px solid #e2e8f0", paddingTop: 8, fontWeight: 600 }}><span>Ganancia neta</span><span style={{ color: reporteMensual.totales.ganancia_neta >= 0 ? "#059669" : "#dc2626" }}>${cop(reporteMensual.totales.ganancia_neta)}</span></div>
+                    <div style={filaStyle}><span>Pérdidas vencidos</span><span style={{ color: "#dc2626" }}>-${cop(reporteMensual.totales.perdida_vencidos)}</span></div>
+                    <div style={filaStyle}><span>Pérdidas devoluciones (50%)</span><span style={{ color: "#d97706" }}>-${cop(reporteMensual.totales.perdida_devoluciones)}</span></div>
                     <div style={{ ...filaStyle, borderTop: "2px solid #1e293b", paddingTop: 10, fontWeight: 700, fontSize: "1.15rem" }}>
-                      <span>🏁 Resultado final del mes</span>
+                      <span>Resultado final del mes</span>
                       <span style={{ color: reporteMensual.totales.resultado_final >= 0 ? "#059669" : "#dc2626" }}>
                         ${cop(reporteMensual.totales.resultado_final)}
                       </span>
@@ -1157,7 +1172,7 @@ function ReporteCierreDetalle({ data, cop, filaStyle }) {
           <span style={{ color: "#dc2626" }}>-${cop(data.costo_vendido)}</span>
         </div>
         <div style={{ ...filaStyle, fontWeight: 700, borderTop: "1px solid #e2e8f0", paddingTop: 8 }}>
-          <span>💰 Ganancia bruta</span>
+          <span>Ganancia bruta</span>
           <span style={{ color: "#059669" }}>${cop(data.ganancia_bruta)}</span>
         </div>
         <div style={filaStyle}>
@@ -1171,7 +1186,7 @@ function ReporteCierreDetalle({ data, cop, filaStyle }) {
           </div>
         ))}
         <div style={{ ...filaStyle, fontWeight: 700, borderTop: "1px solid #e2e8f0", paddingTop: 8 }}>
-          <span>💵 Ganancia neta</span>
+          <span>Ganancia neta</span>
           <span style={{ color: data.ganancia_neta >= 0 ? "#059669" : "#dc2626" }}>${cop(data.ganancia_neta)}</span>
         </div>
         {data.total_perdidas > 0 && (
@@ -1187,7 +1202,7 @@ function ReporteCierreDetalle({ data, cop, filaStyle }) {
           </>
         )}
         <div style={{ ...filaStyle, fontWeight: 700, fontSize: "1.1rem", borderTop: "2px solid #1e293b", paddingTop: 10 }}>
-          <span>🏁 Resultado final</span>
+          <span>Resultado final</span>
           <span style={{ color: data.resultado_final >= 0 ? "#059669" : "#dc2626" }}>${cop(data.resultado_final)}</span>
         </div>
       </div>

@@ -48,20 +48,42 @@ class ImportService:
 
             for row in rows:
                 codigo = str(row["codigo"]).strip()
-                nombre = str(row.get("nombre") or f"Producto {codigo}").strip()
-                precio_fila = Decimal(str(row.get("precio_costo", row.get("precio", 0)) or 0))
+                nombre = str(
+                    row.get("nombre") or f"Producto {codigo}"
+                ).strip()
 
-                if codigo not in product_map and codigo not in products_to_create:
+                # Separar precio_costo y precio_venta
+                pc = Decimal(str(
+                    row.get("precio_costo", row.get("precio", 0)) or 0
+                ))
+                pv = Decimal(str(row.get("precio_venta", 0) or 0))
+
+                # Si solo viene un precio, úsalo para ambos
+                if pc > 0 and pv == 0:
+                    pv = pc
+                elif pv > 0 and pc == 0:
+                    pc = pv
+
+                if codigo not in product_map \
+                        and codigo not in products_to_create:
                     products_to_create[codigo] = Producto(
                         usuario=user,
                         codigo=codigo,
                         nombre=nombre,
-                        valor_unitario=precio_fila,
+                        precio_costo=pc,
+                        valor_unitario=pv,
+                        activo=True,
                     )
                 elif codigo in product_map:
                     producto = product_map[codigo]
-                    if Decimal(producto.valor_unitario) == 0 and precio_fila > 0:
-                        producto.valor_unitario = precio_fila
+                    changed = False
+                    if Decimal(producto.precio_costo) == 0 and pc > 0:
+                        producto.precio_costo = pc
+                        changed = True
+                    if Decimal(producto.valor_unitario) == 0 and pv > 0:
+                        producto.valor_unitario = pv
+                        changed = True
+                    if changed:
                         products_to_update[codigo] = producto
 
             if products_to_create:
@@ -73,15 +95,28 @@ class ImportService:
                     product_map[producto.codigo] = producto
 
             if products_to_update:
-                Producto.objects.bulk_update(list(products_to_update.values()), ["valor_unitario"])
-
-            lot_keys = {
-                (
-                    product_map[str(row["codigo"]).strip()].id,
-                    str(row.get("lote") or "IMPORTADO").strip(),
+                Producto.objects.bulk_update(
+                    list(products_to_update.values()),
+                    ["precio_costo", "valor_unitario"],
                 )
-                for row in rows
-            }
+
+            lot_info = {}
+            for row in rows:
+                product_id = product_map[str(row["codigo"]).strip()].id
+                numero_lote = str(row.get("lote") or "IMPORTADO").strip()
+                key = (product_id, numero_lote)
+                if key not in lot_info:
+                    raw_fv = row.get("fecha_vencimiento")
+                    if raw_fv:
+                        try:
+                            fv = pd.to_datetime(raw_fv).date()
+                        except Exception:
+                            fv = None
+                    else:
+                        fv = None
+                    lot_info[key] = fv
+
+            lot_keys = set(lot_info.keys())
             product_ids = [product_id for product_id, _ in lot_keys]
             lot_numbers = [numero_lote for _, numero_lote in lot_keys]
 
@@ -93,14 +128,18 @@ class ImportService:
                 )
             }
 
+            hoy = timezone.now().date()
             lotes_to_create = []
-            for product_id, numero_lote in lot_keys:
+            for (product_id, numero_lote), fv in lot_info.items():
                 if (product_id, numero_lote) not in lot_map:
+                    fecha_cad = fv if fv else hoy + timezone.timedelta(days=365)
+                    estado_lote = "vencido" if fv and fv < hoy else "activo"
                     lotes_to_create.append(
                         Lote(
                             producto_id=product_id,
                             numero_lote=numero_lote,
-                            fecha_caducidad=timezone.now().date() + timezone.timedelta(days=365),
+                            fecha_caducidad=fecha_cad,
+                            estado=estado_lote,
                         )
                     )
 
@@ -131,7 +170,8 @@ class ImportService:
                     es_entrada = tipo_movimiento == "entrada"
                     cantidad = int(row["cantidad"])
                     fecha = pd.to_datetime(row["fecha"])
-                    precio_fila = Decimal(str(row.get("precio_costo", row.get("precio", 0)) or 0))
+                    pc_fila = Decimal(str(row.get("precio_costo", row.get("precio", 0)) or 0))
+                    pv_fila = Decimal(str(row.get("precio_venta", 0) or 0))
 
                     if es_entrada:
                         movimientos_to_create.append(
@@ -146,7 +186,10 @@ class ImportService:
                         )
                         lot_stock_delta[lote.id] += cantidad
                     else:
-                        precio_venta = precio_fila if precio_fila > 0 else Decimal(producto.valor_unitario)
+                        precio_venta = (
+                            pv_fila if pv_fila > 0
+                            else (pc_fila if pc_fila > 0 else Decimal(producto.valor_unitario))
+                        )
                         venta = Venta(
                             usuario=user,
                             fecha=fecha.date(),

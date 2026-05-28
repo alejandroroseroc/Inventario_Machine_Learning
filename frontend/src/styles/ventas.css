@@ -209,6 +209,9 @@
 .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .text-danger{ color:#b91c1c; }
 
+/* Solo visible al imprimir */
+.print-only { display: none; }
+
 @media print {
   body * { visibility: hidden; }
   .print-section,
@@ -218,7 +221,15 @@
     left: 0;
     top: 0;
     width: 100%;
-    padding: 24px;
+    padding: 32px;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #111;
   }
+  .print-only { display: block !important; }
   .no-print { display: none !important; }
+  .print-section .card { background: white !important; border: none !important; box-shadow: none !important; }
+  .print-section span,
+  .print-section td,
+  .print-section div { color: #111 !important; background: transparent !important; }
+  .print-section hr { border: none; border-top: 1px solid #999; margin: 8px 0; }
 }

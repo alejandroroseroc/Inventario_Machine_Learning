@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Calendar, CheckCircle2, Hash, XCircle, Search } from "lucide-react";
 import { AlertsService } from "../../api/alerts.service";
 import { listLotesPorVencer } from "../lotes/repository";
@@ -79,6 +80,10 @@ const getConfidenceMeta = (expParam = {}) => {
 
 
 export default function AlertsAndSuggestions() {
+  const navigate = useNavigate();
+  const [modalAprobar, setModalAprobar] = useState(null);
+  // modalAprobar = { alertaId, productoId, sugerido }
+
   const [tab, setTab] = useState("caducan");
   const [estado, setEstado] = useState("activa");
   const [diasVenc, setDiasVenc] = useState(60);
@@ -138,6 +143,62 @@ export default function AlertsAndSuggestions() {
       await cargar();
     } catch (error) {
       showNotice("error", "No fue posible actualizar la alerta", error?.payload?.detail || error?.response?.data?.detail || "Intentalo nuevamente.");
+    }
+  };
+
+  const handleAprobarClick = (alerta) => {
+    const sugerido = alerta.explicacion?.sugerido || 0;
+    setModalAprobar({
+      alertaId: alerta.id,
+      productoId: alerta.productoId,
+      sugerido,
+    });
+  };
+
+  const handleConfirmarAprobar = async () => {
+    if (!modalAprobar) return;
+    const { alertaId, productoId, sugerido } = modalAprobar;
+    setModalAprobar(null);
+
+    try {
+      // 1. Marcar como aprobada
+      await AlertsService.resolve(alertaId, "aprobada");
+
+      // 2. Buscar datos del producto (precios y ROP)
+      let ropSugerido = null;
+      try {
+        const ropRes = await fetch(
+          `${import.meta.env.VITE_API_URL || ""}/api/inventory/productos/${productoId}/rop_sugerir`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("access")}`,
+            },
+          }
+        );
+        if (ropRes.ok) {
+          const ropData = await ropRes.json();
+          ropSugerido = ropData.rop_sugerido ?? ropData.rop ?? null;
+        }
+      } catch (_) {
+        // Si falla el ROP, continuar igual
+      }
+
+      // 3. Navegar al detalle del producto con datos pre-llenados
+      navigate(`/productos/${productoId}`, {
+        state: {
+          desde: "alerta_ml",
+          sugerido,
+          rop_sugerido: ropSugerido,
+        },
+      });
+
+      await cargar();
+    } catch (error) {
+      showNotice(
+        "error",
+        "No fue posible aprobar",
+        error?.payload?.detail || "Intentalo nuevamente."
+      );
     }
   };
 
@@ -342,7 +403,7 @@ export default function AlertsAndSuggestions() {
                   <button
                     type="button"
                     className="btn primary suggestion-action"
-                    onClick={() => onResolve(alerta.id, "aprobada")}
+                    onClick={() => handleAprobarClick(alerta)}
                   >
                     <CheckCircle2 size={16} />
                     Aprobar
@@ -371,6 +432,103 @@ export default function AlertsAndSuggestions() {
           <strong>{notice.title}</strong>
           {notice.message ? <span>{notice.message}</span> : null}
           <button type="button" aria-label="Cerrar mensaje" onClick={() => setNotice(null)}>x</button>
+        </div>
+      )}
+
+      {modalAprobar && (
+        <div style={{
+          position: "fixed", inset: 0,
+          background: "rgba(0,0,0,0.45)",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}>
+          <div style={{
+            background: "#fff",
+            borderRadius: 16,
+            padding: 32,
+            maxWidth: 480,
+            width: "90%",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+          }}>
+            <h3 style={{
+              margin: "0 0 12px",
+              fontSize: "1.15rem",
+              color: "#1e293b",
+            }}>
+              Confirmar aprobación de sugerencia ML
+            </h3>
+
+            <p style={{
+              color: "#475569",
+              fontSize: "0.92rem",
+              lineHeight: 1.6,
+              margin: "0 0 12px",
+            }}>
+              El sistema pre-llenará los campos recomendados
+              en el detalle del medicamento:
+              <strong> cantidad sugerida</strong> y
+              <strong> punto de reorden</strong> basados
+              en la predicción.
+            </p>
+
+            <div style={{
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: 10,
+              padding: "12px 16px",
+              marginBottom: 20,
+              fontSize: "0.88rem",
+              color: "#166534",
+              lineHeight: 1.6,
+            }}>
+              <strong>¿Cuándo ingresar la entrada?</strong>
+              <br />
+              Aprueba ahora para guardar la decisión.
+              Cuando el pedido llegue físicamente al depósito,
+              ve al detalle del medicamento, verifica los
+              precios, escribe el número de lote y la fecha
+              de vencimiento del empaque, y registra la entrada.
+            </div>
+
+            <div style={{
+              display: "flex",
+              gap: 12,
+              justifyContent: "flex-end",
+            }}>
+              <button
+                type="button"
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: "#fff",
+                  color: "#475569",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                }}
+                onClick={() => setModalAprobar(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+                onClick={handleConfirmarAprobar}
+              >
+                Sí, aprobar y continuar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

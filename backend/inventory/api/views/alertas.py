@@ -124,6 +124,7 @@ class AlertasStockRecalcularPredictView(APIView):
                 "rmse": round(res.rmse, 2),
                 "wape": round(res.wape, 4),
                 "safety": int(res.safety),
+                "sugerido": sugerido,
                 "top": res.top,
                 "razon": top1,
             }

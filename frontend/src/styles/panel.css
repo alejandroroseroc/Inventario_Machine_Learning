@@ -224,6 +224,11 @@
   grid-template-columns: 1fr;
   gap: 12px;
   margin-top: 12px;
+  align-items: start;
+}
+
+.dashboard-grid > .events-box {
+  margin-top: 0;
 }
 
 @media (min-width: 900px) {

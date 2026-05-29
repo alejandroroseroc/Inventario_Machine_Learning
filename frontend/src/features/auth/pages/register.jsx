@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [okMsg, setOkMsg] = useState(null);
+  const formValid = email.trim() && password && confirm && password === confirm;
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -102,7 +103,7 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !formValid}
             className="btn btn--primary"
             aria-busy={loading}
           >

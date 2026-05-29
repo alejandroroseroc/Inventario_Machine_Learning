@@ -1,4 +1,5 @@
-from django.test import TestCase, RequestFactory
+from django.test import TestCase
+from rest_framework.test import APIRequestFactory, force_authenticate
 from django.contrib.auth.models import User
 from django.utils import timezone
 from decimal import Decimal
@@ -8,7 +9,7 @@ from inventory.api.views.ventas import VentaMonthlyHistoryView
 class VentaHistoryTest(TestCase):
     def setUp(self):
         self.user = User.objects.create(username="testuser")
-        self.factory = RequestFactory()
+        self.factory = APIRequestFactory()
         self.view = VentaMonthlyHistoryView.as_view()
 
     def test_get_monthly_history(self):
@@ -20,7 +21,7 @@ class VentaHistoryTest(TestCase):
         
         # Request
         request = self.factory.get("/api/inventory/ventas/historial-mensual")
-        request.user = self.user
+        force_authenticate(request, user=self.user)
         response = self.view(request)
         
         self.assertEqual(response.status_code, 200)

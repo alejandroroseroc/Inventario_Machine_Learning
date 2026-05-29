@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Calendar, CheckCircle2, Hash, XCircle, Search } from "lucide-react";
 import { AlertsService } from "../../api/alerts.service";
 import { listLotesPorVencer } from "../lotes/repository";
+import { sugerirRop } from "../productos/repository";
 import RevisarLoteModal from "./RevisarLoteModal";
 
 const parseSuggestedUnits = (mensaje) => {
@@ -164,22 +165,12 @@ export default function AlertsAndSuggestions() {
       // 1. Marcar como aprobada
       await AlertsService.resolve(alertaId, "aprobada");
 
-      // 2. Buscar datos del producto (precios y ROP)
+      // 2. Buscar sugerencia de ROP usando el cliente HTTP del sistema.
       let ropSugerido = null;
       try {
-        const ropRes = await fetch(
-          `${import.meta.env.VITE_API_URL || ""}/api/inventory/productos/${productoId}/rop_sugerir`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("access")}`,
-            },
-          }
-        );
-        if (ropRes.ok) {
-          const ropData = await ropRes.json();
-          ropSugerido = ropData.rop_sugerido ?? ropData.rop ?? null;
-        }
-      } catch (_) {
+        const ropData = await sugerirRop(productoId);
+        ropSugerido = ropData.rop_sugerido ?? ropData.rop ?? null;
+      } catch {
         // Si falla el ROP, continuar igual
       }
 

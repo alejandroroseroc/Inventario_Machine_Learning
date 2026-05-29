@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Info, TriangleAlert, X } from "lucide-react";
 import "../../../styles/productos.css";
 import { lotesService } from "../../lotes/service";
 import { movimientosService } from "../../movimientos/service";
@@ -16,6 +16,8 @@ export default function ProductoDetailPage() {
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [prod, setProd] = useState(null);
   const [forecast, setForecast] = useState(null);
@@ -129,21 +131,21 @@ export default function ProductoDetailPage() {
   }, [location.state]);
 
   const precioAutoCalculado = Number(form.precio_costo || 0) > 0 && Number(form.margen_ganancia || 0) > 0;
+  const showNotice = (type, message) => setNotice({ type, message });
 
   const save = async () => {
     setSaving(true);
-    try { const updated = await productoService.update(id, form); setProd(updated); }
-    catch { alert("Error guardando cambios"); }
+    try {
+      const updated = await productoService.update(id, form);
+      setProd(updated);
+      showNotice("ok", "Cambios guardados correctamente.");
+    }
+    catch { showNotice("error", "Error guardando cambios."); }
     finally { setSaving(false); }
   };
 
   const remove = async () => {
-    if (!confirm(
-      "¿Eliminar este medicamento? " +
-      "Si tiene ventas o movimientos registrados, " +
-      "se ofrecerá desactivarlo."
-    )) return;
-
+    setConfirmDelete(false);
     setRemoving(true);
     try {
       await productoService.remove(id);
@@ -153,7 +155,7 @@ export default function ProductoDetailPage() {
           || (e?.payload && e.payload.puede_desactivar)) {
         setMostrarOpcionDesactivar(true);
       } else {
-        alert("No se pudo eliminar el medicamento.");
+        showNotice("error", "No se pudo eliminar el medicamento.");
       }
     } finally {
       setRemoving(false);
@@ -165,7 +167,7 @@ export default function ProductoDetailPage() {
       await desactivarProducto(id);
       navigate("/productos");
     } catch {
-      alert("No se pudo desactivar el medicamento.");
+      showNotice("error", "No se pudo desactivar el medicamento.");
     }
   };
 
@@ -188,8 +190,8 @@ export default function ProductoDetailPage() {
 
   const entradaRapida = async () => {
     const cantidad = Number(entradaForm.cantidad);
-    if (cantidad <= 0) return alert("Cantidad > 0");
-    if (!entradaForm.fecha_caducidad) return alert("Indica la fecha de caducidad");
+    if (cantidad <= 0) return showNotice("error", "La cantidad debe ser mayor a 0.");
+    if (!entradaForm.fecha_caducidad) return showNotice("error", "Indica la fecha de caducidad.");
 
     try {
       const numeroLote = entradaForm.scan?.trim() || null;
@@ -200,9 +202,10 @@ export default function ProductoDetailPage() {
       await movimientosService.create({ producto: Number(id), tipo: "entrada", cantidad, lote: loteId });
       await refreshLotes();
       setEntradaForm({ scan: "", fecha_caducidad: "", cantidad: 0 });
+      showNotice("ok", "Entrada registrada correctamente.");
     } catch (e) {
       console.error(e);
-      alert("No se pudo registrar la entrada");
+      showNotice("error", "No se pudo registrar la entrada.");
     }
   };
 
@@ -210,7 +213,7 @@ export default function ProductoDetailPage() {
     if (!prod?.id) return;
     setCalculando(true);
     try { const data = await sugerirRop(prod.id, { lookback, lead_time: leadTime, ss }); setSugerencia(data); }
-    catch { alert("No se pudo calcular el ROP sugerido."); setSugerencia(null); }
+    catch { showNotice("error", "No se pudo calcular el ROP sugerido."); setSugerencia(null); }
     finally { setCalculando(false); }
   }
 
@@ -221,13 +224,13 @@ export default function ProductoDetailPage() {
       const updated = await patchProducto(prod.id, { punto_reorden: nuevo });
       setProd(updated || { ...prod, punto_reorden: nuevo });
       setForm((s) => ({ ...s, punto_reorden: nuevo }));
-      alert(`Punto de reorden actualizado a ${nuevo}.`);
-    } catch { alert("No se pudo actualizar el punto de reorden."); }
+      showNotice("ok", `Punto de reorden actualizado a ${nuevo}.`);
+    } catch { showNotice("error", "No se pudo actualizar el punto de reorden."); }
   }
 
   const registrarMovimiento = async () => {
     const cantidad = Number(movForm.cantidad);
-    if (cantidad <= 0) return alert("Cantidad debe ser > 0");
+    if (cantidad <= 0) return showNotice("error", "La cantidad debe ser mayor a 0.");
     try {
       await movimientosService.create({
         producto: Number(id),
@@ -239,9 +242,10 @@ export default function ProductoDetailPage() {
       setForecast(f);
       await refreshLotes();
       setMovForm({ tipo: "salida", cantidad: 1, lote_id: "" });
+      showNotice("ok", "Movimiento registrado correctamente.");
     } catch (e) {
       console.error("Error mov:", e?.payload || e);
-      alert((e?.payload && (e.payload.detail || JSON.stringify(e.payload))) || "No se pudo registrar el movimiento");
+      showNotice("error", (e?.payload && (e.payload.detail || JSON.stringify(e.payload))) || "No se pudo registrar el movimiento.");
     }
   };
 
@@ -263,9 +267,35 @@ export default function ProductoDetailPage() {
             Volver
           </Link>
           <button onClick={save} disabled={saving} className="btn btn--primary">{saving ? "Guardando..." : "Guardar cambios"}</button>
-          <button onClick={remove} disabled={removing} className="btn btn--danger">{removing ? "Eliminando..." : "Eliminar"}</button>
+          <button onClick={() => setConfirmDelete(true)} disabled={removing} className="btn btn--danger">{removing ? "Eliminando..." : "Eliminar"}</button>
         </div>
       </div>
+
+      {notice && (
+        <div className={`alert ${notice.type === "ok" ? "alert--ok" : "alert--error"}`} role="status">
+          {notice.message}
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="app-modal-backdrop" role="presentation" onClick={() => setConfirmDelete(false)}>
+          <div className="app-modal" role="dialog" aria-modal="true" aria-labelledby="delete-product-title" onClick={(e) => e.stopPropagation()}>
+            <div className="app-modal__header">
+              <h3 id="delete-product-title">Eliminar medicamento</h3>
+              <button type="button" className="app-modal__close" onClick={() => setConfirmDelete(false)} aria-label="Cerrar">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="app-modal__body">
+              <p>Esta accion intentara eliminar el medicamento. Si tiene ventas o movimientos registrados, el sistema te ofrecera desactivarlo para conservar el historial.</p>
+            </div>
+            <div className="app-modal__footer">
+              <button type="button" className="btn" onClick={() => setConfirmDelete(false)}>Cancelar</button>
+              <button type="button" className="btn btn--danger" onClick={remove}>Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {mostrarOpcionDesactivar && (
         <div style={{
@@ -275,8 +305,9 @@ export default function ProductoDetailPage() {
           padding: 16,
           marginBottom: 16,
         }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 600, color: "#92400e" }}>
-            ⚠️ Este medicamento tiene ventas o movimientos registrados y no puede eliminarse definitivamente.
+          <p style={{ margin: "0 0 12px", fontWeight: 600, color: "#92400e", display: "flex", gap: 8, alignItems: "center" }}>
+            <TriangleAlert size={18} />
+            Este medicamento tiene ventas o movimientos registrados y no puede eliminarse definitivamente.
           </p>
           <p style={{ margin: "0 0 16px", color: "#78350f", fontSize: "0.9rem" }}>
             Puede <strong>desactivarlo</strong>: dejará de aparecer en el inventario y en ventas,
@@ -501,7 +532,7 @@ export default function ProductoDetailPage() {
           gap: 12,
           alignItems: "flex-start",
         }}>
-          <span style={{ fontSize: "1.2rem", marginTop: 2 }}>ℹ</span>
+          <Info size={20} color="#2563eb" style={{ flex: "0 0 auto", marginTop: 2 }} />
           <div>
             <p style={{
               margin: "0 0 4px",

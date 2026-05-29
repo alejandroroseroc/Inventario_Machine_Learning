@@ -27,10 +27,14 @@ class LoteSerializer(serializers.ModelSerializer):
         )
 
     def get_days_left(self, obj):
+        from datetime import date
         from django.utils import timezone
         hoy = timezone.localdate()
-        if obj.fecha_caducidad:
-            return (obj.fecha_caducidad - hoy).days
+        fecha = obj.fecha_caducidad
+        if fecha:
+            if isinstance(fecha, str):
+                fecha = date.fromisoformat(fecha)
+            return (fecha - hoy).days
         return None
 
     def validate_stock_lote(self, v):

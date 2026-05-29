@@ -46,7 +46,9 @@
 
 /* ===== Buttons & links ===== */
 .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
     padding:10px 12px; border-radius:10px; border:1px solid #cbd5e1; background:#f1f5f9; cursor:pointer;
+    font-weight:700;
 }
 .btn:hover{ background:#e2e8f0; }
 .btn:disabled{
@@ -59,8 +61,39 @@
 .btn--primary:disabled:hover{ background:#166534; }
 .btn--danger{ background:#b91c1c; border-color:#991b1b; color:#fff; }
 .btn--danger:hover{ background:#991b1b; }
+.btn--accent{ background:#4f46e5; border-color:#4338ca; color:#fff; }
+.btn--accent:hover{ background:#4338ca; }
 .link-danger{ color:#b91c1c; background:none; border:0; padding:0; cursor:pointer; }
 .link-danger:hover{ text-decoration:underline; }
+
+/* ===== Navegacion interna de ventas ===== */
+.sales-tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:24px;
+    border-bottom:1px solid #dbe3ee;
+    overflow-x:auto;
+}
+.sales-tabs--compact{ margin-bottom:20px; }
+.sales-tab{
+    padding:11px 20px;
+    border:0;
+    border-bottom:3px solid transparent;
+    border-radius:10px 10px 0 0;
+    background:transparent;
+    color:#52637a;
+    cursor:pointer;
+    font-size:.95rem;
+    font-weight:650;
+    white-space:nowrap;
+}
+.sales-tab:hover{ background:#f8fafc; color:#0f172a; }
+.sales-tab.is-active{
+    background:#fff;
+    color:#1d4ed8;
+    border-bottom-color:#2563eb;
+    box-shadow:0 -1px 0 #e2e8f0 inset;
+}
 
 /* ===== Mensajes y modales del sistema ===== */
 .sales-toast {

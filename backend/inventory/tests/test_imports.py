@@ -59,3 +59,21 @@ class CSVImportMarginTests(TestCase):
 
         producto = Producto.objects.get(usuario=self.user, codigo="P002")
         self.assertEqual(producto.margen_ganancia, Decimal("45.00"))
+
+    @patch("inventory.services.imports.recalcular_productos")
+    def test_import_accepts_blank_expiration_date(self, _mock_recalcular):
+        content = (
+            "codigo,nombre,fecha,cantidad,tipo_movimiento,lote,"
+            "precio_costo,precio_venta,fecha_vencimiento\n"
+            "P003,Dolex historico,2025-12-01,3,salida,HISTORICO,,1200,\n"
+        )
+        file_obj = SimpleUploadedFile("ventas.csv", content.encode("utf-8"))
+
+        count, errors = ImportService.import_from_csv(file_obj, self.user)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(count, 1)
+
+        producto = Producto.objects.get(usuario=self.user, codigo="P003")
+        lote = Lote.objects.get(producto=producto, numero_lote="HISTORICO")
+        self.assertIsNotNone(lote.fecha_caducidad)

@@ -122,13 +122,11 @@ class ImportService:
                 key = (product_id, numero_lote)
                 if key not in lot_info:
                     raw_fv = row.get("fecha_vencimiento")
-                    if raw_fv:
-                        try:
-                            fv = pd.to_datetime(raw_fv).date()
-                        except Exception:
-                            fv = None
-                    else:
+                    if pd.isna(raw_fv) or str(raw_fv).strip().lower() in {"", "nan", "nat", "none"}:
                         fv = None
+                    else:
+                        parsed_fv = pd.to_datetime(raw_fv, errors="coerce")
+                        fv = None if pd.isna(parsed_fv) else parsed_fv.date()
                     lot_info[key] = fv
 
             lot_keys = set(lot_info.keys())

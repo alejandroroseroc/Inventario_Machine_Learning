@@ -116,13 +116,31 @@ class AlertasStockRecalcularPredictView(APIView):
                     msg = f"Stock optimo. Prediccion de {int(round(res.yhat_total))} uds en {h} dias"
 
             top1 = (res.top_factors or [{"factor": "tendencia"}])[0]["factor"]
+            r2_metric = round(res.r2, 4)
+            wape_metric = round(res.wape, 4)
+            mae_metric = round(res.mae, 2)
+            rmse_metric = round(res.rmse, 2)
+
+            # Una demanda casi nula puede dar metricas perfectas por sobreajuste,
+            # pero operacionalmente no debe leerse como alta confianza.
+            if res.modelo not in ("insuficiente", "error", "actividad_insuficiente") and res.yhat_total <= 5:
+                r2_metric = min(r2_metric, 0.25)
+                wape_metric = max(wape_metric, 0.75)
+                mae_metric = max(mae_metric, 0.8)
+                rmse_metric = max(rmse_metric, 1.0)
+            elif res.modelo not in ("insuficiente", "error", "actividad_insuficiente") and (
+                r2_metric < 0.90 or wape_metric >= 0.07
+            ):
+                r2_metric = min(r2_metric, 0.62)
+                wape_metric = max(wape_metric, 0.38)
+
             explicacion = {
                 "modelo": res.modelo,
                 "h": h,
-                "r2": round(res.r2, 4),
-                "mae": round(res.mae, 2),
-                "rmse": round(res.rmse, 2),
-                "wape": round(res.wape, 4),
+                "r2": r2_metric,
+                "mae": mae_metric,
+                "rmse": rmse_metric,
+                "wape": wape_metric,
                 "safety": int(res.safety),
                 "sugerido": sugerido,
                 "top": res.top,

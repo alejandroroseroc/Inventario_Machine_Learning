@@ -8,6 +8,7 @@ const CATS = [
 
 export default function ProductoForm({ onSubmit, submitting }) {
   const [auto, setAuto] = useState(true);
+  const [formError, setFormError] = useState("");
 
   const [form, setForm] = useState({
     codigo: "",
@@ -57,14 +58,15 @@ export default function ProductoForm({ onSubmit, submitting }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setFormError("");
 
     if (tieneAlgunCampoLote) {
       if (!loteForm.fecha_caducidad || !loteForm.cantidad) {
-        alert("Si ingresas stock inicial, la fecha de vencimiento y la cantidad son obligatorias.");
+        setFormError("Si ingresas stock inicial, la fecha de vencimiento y la cantidad son obligatorias.");
         return;
       }
       if (Number(loteForm.cantidad) < 1) {
-        alert("La cantidad del lote inicial debe ser al menos 1.");
+        setFormError("La cantidad del lote inicial debe ser al menos 1.");
         return;
       }
     }
@@ -103,11 +105,13 @@ export default function ProductoForm({ onSubmit, submitting }) {
         margen_ganancia: 0,
       });
       setLoteForm({ numero_lote: "", fecha_caducidad: "", cantidad: "" });
+      setFormError("");
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="card" aria-labelledby="pf_title">
+      {formError && <div className="alert alert--error" role="alert">{formError}</div>}
       <div className="row">
         <div className="col">
           <label htmlFor="pf_codigo">Código</label>

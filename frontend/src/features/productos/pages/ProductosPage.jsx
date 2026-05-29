@@ -1,13 +1,22 @@
-import { useEffect, useRef, useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import "../../../styles/productos.css";
 import ProductoForm from "../components/ProductoForm";
 import ProductoTable from "../components/ProductoTable";
-import { FileUp, ArrowLeft, Search } from "lucide-react";
+import {
+  ArchiveX,
+  CheckCircle2,
+  FileUp,
+  PackageX,
+  RotateCcw,
+  Search,
+  TriangleAlert,
+} from "lucide-react";
 import { importarCSV } from "../importService";
 import { productoCreate, productosList } from "../service";
 import { marcarVencidosAuto, listLotesVencidos, listLotesDevoluciones } from "../../lotes/repository";
 import { getProductosInactivos, reactivarProducto } from "../repository";
+
+const money = (value) => Number(value || 0).toLocaleString("es-CO");
 
 export default function ProductosPage() {
   const [items, setItems] = useState([]);
@@ -19,7 +28,6 @@ export default function ProductosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const fileInputRef = useRef(null);
 
-  // Pestañas de inventario
   const [tabInventario, setTabInventario] = useState("activos");
   const [lotesVencidos, setLotesVencidos] = useState([]);
   const [lotesDevoluciones, setLotesDevoluciones] = useState([]);
@@ -27,22 +35,19 @@ export default function ProductosPage() {
   const [inactivos, setInactivos] = useState([]);
   const [loadingInactivos, setLoadingInactivos] = useState(false);
 
-  // Estilos de tabla compartidos
-  const thStyle = {
-    padding: "10px 12px", textAlign: "left",
-    fontWeight: 700, fontSize: "0.8rem",
-    color: "#475569", borderBottom: "2px solid #e2e8f0",
-  };
-  const tdStyle = {
-    padding: "10px 12px", fontSize: "0.9rem",
-    verticalAlign: "middle",
-  };
-
   async function load() {
-    setLoading(true); setError(""); setOk("");
-    try { const data = await productosList(); setItems(Array.isArray(data) ? data : []); }
-    catch (e) { setError(e?.message || "No se pudieron cargar los productos."); console.error(e); }
-    finally { setLoading(false); }
+    setLoading(true);
+    setError("");
+    setOk("");
+    try {
+      const data = await productosList();
+      setItems(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(e?.message || "No se pudieron cargar los productos.");
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadListasEspeciales() {
@@ -81,17 +86,29 @@ export default function ProductosPage() {
   }, []);
 
   async function handleCreate(form) {
-    setCreating(true); setError(""); setOk("");
-    try { await productoCreate(form); setOk("Producto guardado correctamente."); await load(); return true; }
-    catch (e) { setError(e?.message || "No se pudo crear el producto."); return false; }
-    finally { setCreating(false); }
+    setCreating(true);
+    setError("");
+    setOk("");
+    try {
+      await productoCreate(form);
+      setOk("Producto guardado correctamente.");
+      await load();
+      return true;
+    } catch (e) {
+      setError(e?.message || "No se pudo crear el producto.");
+      return false;
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function handleImport(e) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImporting(true); setError(""); setOk("");
+    setImporting(true);
+    setError("");
+    setOk("");
     try {
       const res = await importarCSV(file);
       setOk(res.message || `Se importaron ${res.count} registros.`);
@@ -107,7 +124,7 @@ export default function ProductosPage() {
   const filteredItems = useMemo(() => {
     if (!searchTerm) return items;
     const lower = searchTerm.toLowerCase();
-    return items.filter(item => {
+    return items.filter((item) => {
       const name = (item.nombre || "").toLowerCase();
       const code = (item.codigo || "").toLowerCase();
       const barcode = (item.codigo_barras || "").toLowerCase();
@@ -115,89 +132,67 @@ export default function ProductosPage() {
     });
   }, [items, searchTerm]);
 
+  const tabs = [
+    { key: "activos", label: "Medicamentos activos", count: 0, Icon: CheckCircle2, tone: "success" },
+    { key: "vencidos", label: "Vencidos", count: lotesVencidos.length, Icon: TriangleAlert, tone: "danger" },
+    { key: "devoluciones", label: "Devoluciones", count: lotesDevoluciones.length, Icon: RotateCcw, tone: "warning" },
+    { key: "inactivos", label: "Inactivos", count: inactivos.length, Icon: ArchiveX, tone: "neutral" },
+  ];
+
   return (
     <div className="page page--productos">
       <div className="page__head">
         <h2 className="page__title" id="pf_title">Inventario</h2>
 
-        <div className="page__actions" style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+        <div className="page__actions">
           <input
             type="file"
             accept=".csv"
             ref={fileInputRef}
             onChange={handleImport}
-            style={{ display: "none" }}
+            hidden
           />
           <button
-            className="btn btn--secondary"
+            className="btn btn--secondary btn--icon"
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
-            style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "#1e293b" }}
           >
-            <FileUp size={18} color="#4f46e5" strokeWidth={2.5} />
+            <FileUp size={18} strokeWidth={2.4} />
             {importing ? "Importando..." : "Importar CSV"}
           </button>
-          <Link
-            to="/panel"
-            className="btn"
-            style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "#1e293b" }}
-          >
-            <ArrowLeft size={18} color="#64748b" strokeWidth={2.5} />
-            Volver al Panel
-          </Link>
         </div>
       </div>
 
-      {/* Pestañas de inventario */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "2px solid #e2e8f0" }}>
-        {[
-          { key: "activos", label: "✅ Medicamentos Activos" },
-          {
-            key: "vencidos",
-            label: `🔴 Vencidos${lotesVencidos.length > 0 ? ` (${lotesVencidos.length})` : ""}`,
-          },
-          {
-            key: "devoluciones",
-            label: `🟡 Devoluciones${lotesDevoluciones.length > 0 ? ` (${lotesDevoluciones.length})` : ""}`,
-          },
-          {
-            key: "inactivos",
-            label: `⚫ Inactivos${inactivos.length > 0 ? ` (${inactivos.length})` : ""}`,
-          },
-        ].map((t) => (
+      <div className="inventory-tabs" role="tablist" aria-label="Vistas de inventario">
+        {tabs.map(({ key, label, count, Icon: TabIcon, tone }) => (
           <button
-            key={t.key}
-            onClick={() => setTabInventario(t.key)}
-            style={{
-              padding: "10px 20px",
-              border: "none",
-              background: "transparent",
-              borderBottom: tabInventario === t.key ? "3px solid #2563eb" : "3px solid transparent",
-              color: tabInventario === t.key ? "#2563eb" : "#64748b",
-              fontWeight: tabInventario === t.key ? 700 : 500,
-              cursor: "pointer",
-              fontSize: "0.95rem",
-              marginBottom: -2,
-            }}
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tabInventario === key}
+            className={`inventory-tab inventory-tab--${tone} ${tabInventario === key ? "is-active" : ""}`}
+            onClick={() => setTabInventario(key)}
           >
-            {t.label}
+            <span className="inventory-tab__icon">
+              {createElement(TabIcon, { size: 18, strokeWidth: 2.4 })}
+            </span>
+            <span>{label}{count > 0 ? ` (${count})` : ""}</span>
           </button>
         ))}
       </div>
 
-      {/* ── Pestaña Activos ── */}
       {tabInventario === "activos" && (
         <>
           <section className="help" aria-labelledby="ayuda_inv_titulo">
-            <h3 id="ayuda_inv_titulo">¿Cómo registrar un medicamento?</h3>
+            <h3 id="ayuda_inv_titulo">Como registrar un medicamento</h3>
             <ol>
-              <li>Escribe <strong>Código</strong> y <strong>Nombre</strong> tal como los usas en la droguería.</li>
-              <li>Ingresa el <strong>Valor unitario</strong>. Con eso sugerimos <strong>Categoría ABC</strong> y <strong>ROP</strong>.</li>
-              <li>Si quieres, desactiva "Auto-sugerir" para ajustar manualmente la categoría o el ROP.</li>
-              <li>Guarda el producto. Lo verás en la tabla de abajo.</li>
+              <li>Escribe <strong>Codigo</strong> y <strong>Nombre</strong> tal como los usas en la drogueria.</li>
+              <li>Ingresa el <strong>Valor unitario</strong>. Con eso sugerimos <strong>Categoria ABC</strong> y <strong>ROP</strong>.</li>
+              <li>Si quieres, desactiva "Auto-sugerir" para ajustar manualmente la categoria o el ROP.</li>
+              <li>Guarda el producto. Lo veras en la tabla de abajo.</li>
             </ol>
             <p className="help__note">
-              * Estas sugerencias son temporales. Cuando carguemos ventas reales, el sistema propondrá valores basados en tu historial.
+              Estas sugerencias son temporales. Cuando cargues ventas reales, el sistema propondra valores basados en tu historial.
             </p>
           </section>
 
@@ -206,190 +201,179 @@ export default function ProductosPage() {
 
           <ProductoForm onSubmit={handleCreate} submitting={creating} />
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, marginBottom: 12 }}>
-            <h3 style={{ margin: 0 }}>Listado</h3>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", padding: "6px 12px", borderRadius: 8, border: "1px solid #d1d5db", minWidth: 250 }}>
-              <Search size={16} color="#9ca3af" />
+          <div className="inventory-list-head">
+            <h3>Listado</h3>
+            <div className="inventory-search">
+              <Search size={16} />
               <input
                 type="text"
                 placeholder="Buscar medicamento..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ border: "none", outline: "none", background: "transparent", width: "100%", fontSize: "0.9rem", color: "#1e293b" }}
               />
             </div>
           </div>
 
-          {loading ? <p>Cargando…</p> : <ProductoTable items={filteredItems} />}
+          {loading ? <p>Cargando...</p> : <ProductoTable items={filteredItems} />}
         </>
       )}
 
-      {/* ── Pestaña Vencidos ── */}
       {tabInventario === "vencidos" && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <h3 style={{ color: "#dc2626", marginTop: 0 }}>🔴 Lotes Vencidos — Pérdida Total</h3>
-          <p style={{ color: "#64748b", fontSize: "0.9rem" }}>
-            Estos lotes ya fueron dados de baja. Se muestra la pérdida a precio costo.
-          </p>
-          {loadingListas ? <p>Cargando...</p> : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "#fef2f2" }}>
-                  <th style={thStyle}>MEDICAMENTO</th>
-                  <th style={thStyle}>N° LOTE</th>
-                  <th style={thStyle}>VENCIÓ</th>
-                  <th style={thStyle}>CANTIDAD</th>
-                  <th style={{ ...thStyle, color: "#dc2626" }}>PÉRDIDA (costo)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lotesVencidos.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: 24, color: "#94a3b8" }}>
-                      No hay lotes vencidos registrados
-                    </td>
-                  </tr>
-                ) : lotesVencidos.map((l) => (
-                  <tr key={l.lote_id} style={{ borderBottom: "1px solid #fecaca", background: "#fff5f5" }}>
-                    <td style={tdStyle}>{l.producto_nombre}</td>
-                    <td style={tdStyle}>{l.numero_lote}</td>
-                    <td style={tdStyle}>{l.fecha_caducidad}</td>
-                    <td style={tdStyle}>{l.stock_retirado} uds</td>
-                    <td style={{ ...tdStyle, color: "#dc2626", fontWeight: 700 }}>
-                      ${Number(l.perdida_total || 0).toLocaleString("es-CO")}
-                    </td>
-                  </tr>
-                ))}
-                {lotesVencidos.length > 0 && (
-                  <tr style={{ background: "#fee2e2" }}>
-                    <td colSpan={4} style={{ ...tdStyle, fontWeight: 700, textAlign: "right" }}>
-                      Total pérdidas:
-                    </td>
-                    <td style={{ ...tdStyle, color: "#dc2626", fontWeight: 700 }}>
-                      ${lotesVencidos.reduce((s, l) => s + Number(l.perdida_total || 0), 0).toLocaleString("es-CO")}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <StatusLotesCard
+          tone="danger"
+          Icon={PackageX}
+          title="Lotes vencidos - Perdida total"
+          description="Estos lotes ya fueron dados de baja. Se muestra la perdida a precio costo."
+          loading={loadingListas}
+          rows={lotesVencidos}
+          emptyText="No hay lotes vencidos registrados"
+          amountKey="perdida_total"
+          amountLabel="PERDIDA (costo)"
+          qtyKey="stock_retirado"
+          dateLabel="VENCIO"
+          totalLabel="Total perdidas"
+        />
       )}
 
-      {/* ── Pestaña Devoluciones ── */}
       {tabInventario === "devoluciones" && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <h3 style={{ color: "#d97706", marginTop: 0 }}>🟡 Lotes en Devolución al Proveedor</h3>
-          <p style={{ color: "#64748b", fontSize: "0.9rem" }}>
-            Estos lotes fueron enviados a devolución. Pérdida estimada del 50% del precio costo.
-          </p>
-          {loadingListas ? <p>Cargando...</p> : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "#fffbeb" }}>
-                  <th style={thStyle}>MEDICAMENTO</th>
-                  <th style={thStyle}>N° LOTE</th>
-                  <th style={thStyle}>VENCÍA</th>
-                  <th style={thStyle}>CANTIDAD</th>
-                  <th style={{ ...thStyle, color: "#d97706" }}>PÉRDIDA 50% (costo)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lotesDevoluciones.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: 24, color: "#94a3b8" }}>
-                      No hay lotes en devolución registrados
-                    </td>
-                  </tr>
-                ) : lotesDevoluciones.map((l) => (
-                  <tr key={l.lote_id} style={{ borderBottom: "1px solid #fde68a", background: "#fffdf0" }}>
-                    <td style={tdStyle}>{l.producto_nombre}</td>
-                    <td style={tdStyle}>{l.numero_lote}</td>
-                    <td style={tdStyle}>{l.fecha_caducidad}</td>
-                    <td style={tdStyle}>{l.stock_devuelto} uds</td>
-                    <td style={{ ...tdStyle, color: "#d97706", fontWeight: 700 }}>
-                      ${Number(l.perdida_50 || 0).toLocaleString("es-CO")}
-                    </td>
-                  </tr>
-                ))}
-                {lotesDevoluciones.length > 0 && (
-                  <tr style={{ background: "#fef3c7" }}>
-                    <td colSpan={4} style={{ ...tdStyle, fontWeight: 700, textAlign: "right" }}>
-                      Total pérdidas:
-                    </td>
-                    <td style={{ ...tdStyle, color: "#d97706", fontWeight: 700 }}>
-                      ${lotesDevoluciones.reduce((s, l) => s + Number(l.perdida_50 || 0), 0).toLocaleString("es-CO")}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <StatusLotesCard
+          tone="warning"
+          Icon={RotateCcw}
+          title="Lotes en devolucion al proveedor"
+          description="Estos lotes fueron enviados a devolucion. Perdida estimada del 50% del precio costo."
+          loading={loadingListas}
+          rows={lotesDevoluciones}
+          emptyText="No hay lotes en devolucion registrados"
+          amountKey="perdida_50"
+          amountLabel="PERDIDA 50% (costo)"
+          qtyKey="stock_devuelto"
+          dateLabel="VENCIA"
+          totalLabel="Total perdidas"
+        />
       )}
-      {/* ── Pestaña Inactivos ── */}
+
       {tabInventario === "inactivos" && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <h3 style={{ color: "#374151", marginTop: 0 }}>⚫ Medicamentos Inactivos</h3>
-          <p style={{ color: "#64748b", fontSize: "0.9rem" }}>
-            Estos medicamentos fueron desactivados. No aparecen en ventas ni en el inventario activo.
-            Puedes reactivarlos cuando lo necesites.
-          </p>
+        <section className="status-card status-card--neutral">
+          <header className="status-card__head">
+            <span className="status-title__icon"><ArchiveX size={20} /></span>
+            <div>
+              <h3>Medicamentos inactivos</h3>
+              <p>Estos medicamentos fueron desactivados. No aparecen en ventas ni en el inventario activo.</p>
+            </div>
+          </header>
+
           {loadingInactivos ? <p>Cargando...</p> : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "#f1f5f9" }}>
-                  <th style={thStyle}>MEDICAMENTO</th>
-                  <th style={thStyle}>CÓDIGO</th>
-                  <th style={thStyle}>CATEGORÍA</th>
-                  <th style={thStyle}>PRECIO VENTA</th>
-                  <th style={thStyle}>ACCIÓN</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inactivos.length === 0 ? (
+            <div className="status-table-wrap">
+              <table className="status-table">
+                <thead>
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: 24, color: "#94a3b8" }}>
-                      No hay medicamentos inactivos
-                    </td>
+                    <th>MEDICAMENTO</th>
+                    <th>CODIGO</th>
+                    <th>CATEGORIA</th>
+                    <th>PRECIO VENTA</th>
+                    <th>ACCION</th>
                   </tr>
-                ) : inactivos.map(p => (
-                  <tr key={p.id} style={{ borderBottom: "1px solid #e2e8f0", opacity: 0.75 }}>
-                    <td style={tdStyle}>{p.nombre}</td>
-                    <td style={tdStyle}>{p.codigo}</td>
-                    <td style={tdStyle}>{p.categoria}</td>
-                    <td style={tdStyle}>
-                      ${Number(p.valor_unitario || 0).toLocaleString("es-CO")}
-                    </td>
-                    <td style={tdStyle}>
-                      <button
-                        className="btn"
-                        style={{
-                          background: "#059669",
-                          color: "#fff",
-                          border: "none",
-                          fontSize: "0.85rem",
-                          padding: "6px 14px",
-                        }}
-                        onClick={async () => {
-                          try {
-                            await reactivarProducto(p.id);
-                            await Promise.all([load(), loadInactivos()]);
-                          } catch {
-                            alert("No se pudo reactivar.");
-                          }
-                        }}
-                      >
-                        Reactivar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {inactivos.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="status-empty">No hay medicamentos inactivos</td>
+                    </tr>
+                  ) : inactivos.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.nombre}</td>
+                      <td>{p.codigo}</td>
+                      <td>{p.categoria}</td>
+                      <td>${money(p.valor_unitario)}</td>
+                      <td>
+                        <button
+                          className="btn btn--primary btn--sm"
+                          onClick={async () => {
+                            try {
+                              await reactivarProducto(p.id);
+                              await Promise.all([load(), loadInactivos()]);
+                            } catch {
+                              setError("No se pudo reactivar el producto.");
+                            }
+                          }}
+                        >
+                          Reactivar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </section>
       )}
     </div>
+  );
+}
+
+function StatusLotesCard({
+  tone,
+  Icon: CardIcon,
+  title,
+  description,
+  loading,
+  rows,
+  emptyText,
+  amountKey,
+  amountLabel,
+  qtyKey,
+  dateLabel,
+  totalLabel,
+}) {
+  const total = rows.reduce((sum, row) => sum + Number(row[amountKey] || 0), 0);
+
+  return (
+    <section className={`status-card status-card--${tone}`}>
+      <header className="status-card__head">
+        <span className="status-title__icon">{createElement(CardIcon, { size: 20 })}</span>
+        <div>
+          <h3>{title}</h3>
+          <p>{description}</p>
+        </div>
+      </header>
+
+      {loading ? <p>Cargando...</p> : (
+        <div className="status-table-wrap">
+          <table className="status-table">
+            <thead>
+              <tr>
+                <th>MEDICAMENTO</th>
+                <th>N. LOTE</th>
+                <th>{dateLabel}</th>
+                <th>CANTIDAD</th>
+                <th>{amountLabel}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="status-empty">{emptyText}</td>
+                </tr>
+              ) : rows.map((row) => (
+                <tr key={row.lote_id}>
+                  <td>{row.producto_nombre}</td>
+                  <td>{row.numero_lote}</td>
+                  <td>{row.fecha_caducidad}</td>
+                  <td>{row[qtyKey]} uds</td>
+                  <td className="status-amount">${money(row[amountKey])}</td>
+                </tr>
+              ))}
+              {rows.length > 0 && (
+                <tr className="status-total-row">
+                  <td colSpan={4}>{totalLabel}:</td>
+                  <td>${money(total)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }

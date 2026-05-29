@@ -1,22 +1,29 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
-import Register from '../pages/register'
+import { describe, it, expect } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { BrowserRouter } from "react-router-dom";
+import { AuthProvider } from "../../../context/AuthContext";
+import Register from "../pages/register";
 
 function setup() {
-  render(<BrowserRouter><Register /></BrowserRouter>)
+  render(
+    <BrowserRouter>
+      <AuthProvider>
+        <Register />
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
 
-describe('Register page', () => {
-  it('deshabilita el botón hasta que la forma sea válida', () => {
-    setup()
-    const btn = screen.getByRole('button', { name:/registrarme/i })
-    expect(btn).toBeDisabled()
+describe("Register page", () => {
+  it("deshabilita el boton hasta que la forma sea valida", () => {
+    setup();
+    const btn = screen.getByRole("button", { name: /crear cuenta/i });
+    expect(btn).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText(/correo/i), { target:{ value:'a@a.com' } })
-    fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target:{ value:'Demo1234!' } })
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target:{ value:'Demo1234!' } })
+    fireEvent.change(screen.getByLabelText(/correo/i), { target: { value: "a@a.com" } });
+    fireEvent.change(screen.getByLabelText(/^contrase/i), { target: { value: "Demo1234!" } });
+    fireEvent.change(screen.getByLabelText(/confirmar contrase/i), { target: { value: "Demo1234!" } });
 
-    expect(btn).not.toBeDisabled()
-  })
-})
+    expect(btn).not.toBeDisabled();
+  });
+});

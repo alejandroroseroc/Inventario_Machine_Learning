@@ -22,20 +22,17 @@ export default function App() {
   return (
     <>
       <Navbar />
-      <Suspense fallback={<div style={{ padding: 16 }}>Cargando…</div>}>
+      <Suspense fallback={<div style={{ padding: 16 }}>Cargando...</div>}>
         <Routes>
-          {/* públicas */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* privadas */}
           <Route path="/" element={<PrivateRoute><Panel /></PrivateRoute>} />
           <Route path="/panel" element={<PrivateRoute><Panel /></PrivateRoute>} />
           <Route path="/productos" element={<PrivateRoute><ProductosPage /></PrivateRoute>} />
           <Route path="/productos/:id" element={<PrivateRoute><ProductoDetailPage /></PrivateRoute>} />
           <Route path="/ventas" element={<PrivateRoute><RegistrarVentaPage /></PrivateRoute>} />
 
-          {/* 🔧 Ruta de alertas */}
           <Route
             path="/alertas/sugerencias"
             element={
@@ -47,7 +44,6 @@ export default function App() {
             }
           />
 
-          {/* 🔐 Panel administrador (solo is_staff=True) */}
           <Route
             path="/admin"
             element={
@@ -59,7 +55,6 @@ export default function App() {
             }
           />
 
-          {/* fallback */}
           <Route path="*" element={<Login />} />
         </Routes>
       </Suspense>

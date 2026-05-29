@@ -1,4 +1,5 @@
-from django.test import TestCase, RequestFactory
+from django.test import TestCase
+from rest_framework.test import APIRequestFactory, force_authenticate
 from inventory.models import Venta, Producto, VentaItem
 from inventory.api.views.ventas import VentaDetailView
 from django.contrib.auth.models import User
@@ -8,7 +9,7 @@ from unittest.mock import patch
 class AnnulmentErrorTest(TestCase):
     def setUp(self):
         self.user = User.objects.create(username="testuser")
-        self.factory = RequestFactory()
+        self.factory = APIRequestFactory()
         self.view = VentaDetailView.as_view()
 
     @patch("inventory.api.views.ventas.anular_venta")
@@ -21,7 +22,7 @@ class AnnulmentErrorTest(TestCase):
         
         # Request
         request = self.factory.delete(f"/api/inventory/ventas/{venta.id}/")
-        request.user = self.user
+        force_authenticate(request, user=self.user)
         response = self.view(request, pk=venta.id)
 
         # Assert

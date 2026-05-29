@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FileText, Plus } from "lucide-react";
 import {
   anularVenta,
   buscarLotePorNumero,
@@ -8,7 +9,6 @@ import {
   getHistorialPaginado,
   listarLotes,
   listarVentasHoy,
-  getGastosDia,
   crearGasto,
   eliminarGasto,
   getReporteDiario,
@@ -178,7 +178,7 @@ export default function RegistrarVentaPage() {
       setGastoForm({ monto: "", observacion: "" });
       await cargarCierreDia(new Date().toISOString().split("T")[0]);
       showNotice("success", "Gasto registrado");
-    } catch (e) {
+    } catch {
       showNotice("error", "No se pudo registrar el gasto");
     } finally {
       setGuardandoGasto(false);
@@ -190,7 +190,7 @@ export default function RegistrarVentaPage() {
       await eliminarGasto(gastoId);
       await cargarCierreDia(new Date().toISOString().split("T")[0]);
       showNotice("success", "Gasto eliminado");
-    } catch (e) {
+    } catch {
       showNotice("error", "No se pudo eliminar el gasto");
     }
   };
@@ -435,7 +435,7 @@ export default function RegistrarVentaPage() {
       )}
 
       {/* Tabs principales */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "2px solid #e2e8f0" }}>
+      <div className="sales-tabs" role="tablist" aria-label="Vistas de ventas">
         {[
           { key: "ventas", label: "Registrar Venta" },
           { key: "cierre", label: "Cierre del Día" },
@@ -445,15 +445,9 @@ export default function RegistrarVentaPage() {
             key={t.key}
             type="button"
             onClick={() => setTabPrincipal(t.key)}
-            style={{
-              padding: "10px 20px", border: "none",
-              background: "transparent",
-              borderBottom: tabPrincipal === t.key ? "3px solid #2563eb" : "3px solid transparent",
-              color: tabPrincipal === t.key ? "#2563eb" : "#64748b",
-              fontWeight: tabPrincipal === t.key ? 700 : 500,
-              cursor: "pointer", fontSize: "0.95rem",
-              marginBottom: -2,
-            }}
+            role="tab"
+            aria-selected={tabPrincipal === t.key}
+            className={`sales-tab ${tabPrincipal === t.key ? "is-active" : ""}`}
           >
             {t.label}
           </button>
@@ -636,13 +630,9 @@ export default function RegistrarVentaPage() {
       <div className="actions actions--end">
         <button
           className="btn"
-          onClick={async () => {
-            const c = await getCierreDia().catch(() => null);
-            if (!c) return alert("No se pudo obtener el cierre.");
-            alert(`Cierre de hoy\nVentas: ${c.ventas_registradas}\nAnuladas: ${c.ventas_anuladas}\nTotal día: $${money(c.total_dia)}\nGanancia estimada: $${money(c.ganancia_dia ?? 0)}`);
-          }}
+          onClick={handleCierreDelDia}
         >
-          Cierre del día
+          Ver cierre del dia
         </button>
       </div>
 
@@ -889,7 +879,12 @@ export default function RegistrarVentaPage() {
                     style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1" }}
                   />
                   <button type="button" className="btn btn--primary" onClick={handleAgregarGasto} disabled={guardandoGasto}>
-                    {guardandoGasto ? "..." : "+ Agregar"}
+                    {guardandoGasto ? "..." : (
+                      <>
+                        <Plus size={16} />
+                        Agregar
+                      </>
+                    )}
                   </button>
                 </div>
                 {cierreDia.gastos.length === 0 ? (
@@ -959,7 +954,7 @@ export default function RegistrarVentaPage() {
         <div>
           <h2 style={{ fontSize: "1.3rem", marginBottom: 16 }}>Cierres Anteriores</h2>
 
-          <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "2px solid #e2e8f0" }}>
+          <div className="sales-tabs sales-tabs--compact" role="tablist" aria-label="Tipos de cierre">
             {[
               { key: "diario", label: "Diario" },
               { key: "semanal", label: "Semanal" },
@@ -969,13 +964,9 @@ export default function RegistrarVentaPage() {
                 key={t.key}
                 type="button"
                 onClick={() => setTabReporte(t.key)}
-                style={{
-                  padding: "8px 18px", border: "none", background: "transparent",
-                  borderBottom: tabReporte === t.key ? "3px solid #2563eb" : "3px solid transparent",
-                  color: tabReporte === t.key ? "#2563eb" : "#64748b",
-                  fontWeight: tabReporte === t.key ? 700 : 500,
-                  cursor: "pointer", marginBottom: -2,
-                }}
+                role="tab"
+                aria-selected={tabReporte === t.key}
+                className={`sales-tab ${tabReporte === t.key ? "is-active" : ""}`}
               >
                 {t.label}
               </button>
@@ -1080,7 +1071,8 @@ export default function RegistrarVentaPage() {
                   {loadingReporte ? "Cargando..." : "Ver mes"}
                 </button>
                 {reporteMensual && (
-                  <button type="button" className="btn" onClick={handlePrintMensual} style={{ background: "#7c3aed", color: "#fff", border: "none" }}>
+                  <button type="button" className="btn btn--accent" onClick={handlePrintMensual}>
+                    <FileText size={16} />
                     Exportar PDF
                   </button>
                 )}

@@ -57,12 +57,23 @@ class ImportService:
                     row.get("precio_costo", row.get("precio", 0)) or 0
                 ))
                 pv = Decimal(str(row.get("precio_venta", 0) or 0))
+                mg = Decimal(str(row.get("margen_ganancia", 0) or 0))
 
                 # Si solo viene un precio, úsalo para ambos
-                if pc > 0 and pv == 0:
+                if mg == 0 and pc > 0 and pv > 0 and pv >= pc:
+                    mg = ((pv - pc) / pc) * Decimal("100")
+
+                if pc > 0 and pv == 0 and mg > 0:
+                    pv = pc * (Decimal("1") + (mg / Decimal("100")))
+                elif pc > 0 and pv == 0:
                     pv = pc
                 elif pv > 0 and pc == 0:
                     pc = pv
+
+                if mg > 0:
+                    mg = mg.quantize(Decimal("0.01"))
+                if pv > 0:
+                    pv = pv.quantize(Decimal("0.01"))
 
                 if codigo not in product_map \
                         and codigo not in products_to_create:
@@ -72,6 +83,7 @@ class ImportService:
                         nombre=nombre,
                         precio_costo=pc,
                         valor_unitario=pv,
+                        margen_ganancia=mg,
                         activo=True,
                     )
                 elif codigo in product_map:
@@ -82,6 +94,9 @@ class ImportService:
                         changed = True
                     if Decimal(producto.valor_unitario) == 0 and pv > 0:
                         producto.valor_unitario = pv
+                        changed = True
+                    if mg > 0 and Decimal(producto.margen_ganancia) != mg:
+                        producto.margen_ganancia = mg
                         changed = True
                     if changed:
                         products_to_update[codigo] = producto
@@ -97,7 +112,7 @@ class ImportService:
             if products_to_update:
                 Producto.objects.bulk_update(
                     list(products_to_update.values()),
-                    ["precio_costo", "valor_unitario"],
+                    ["precio_costo", "valor_unitario", "margen_ganancia"],
                 )
 
             lot_info = {}
@@ -169,7 +184,9 @@ class ImportService:
                     tipo_movimiento = str(row.get("tipo_movimiento", "salida")).lower().strip()
                     es_entrada = tipo_movimiento == "entrada"
                     cantidad = int(row["cantidad"])
-                    fecha = pd.to_datetime(row["fecha"])
+                    fecha = pd.to_datetime(row["fecha"]).to_pydatetime()
+                    if timezone.is_naive(fecha):
+                        fecha = timezone.make_aware(fecha)
                     pc_fila = Decimal(str(row.get("precio_costo", row.get("precio", 0)) or 0))
                     pv_fila = Decimal(str(row.get("precio_venta", 0) or 0))
 

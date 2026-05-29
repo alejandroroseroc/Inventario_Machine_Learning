@@ -25,6 +25,11 @@ class CSVCleaner:
             'valor_unitario', 'precio_vta', 'valor_venta',
             'precio_cliente',
         ],
+        'margen_ganancia': [
+            'margen_ganancia', 'margen', 'ganancia',
+            'porcentaje_ganancia', 'porcentaje de ganancia',
+            'utilidad', 'margen_utilidad',
+        ],
         'fecha_vencimiento': [
             'fecha_vencimiento', 'vencimiento', 'caducidad',
             'fecha_caducidad', 'expira', 'exp', 'vence',
@@ -81,7 +86,8 @@ class CSVCleaner:
             col_data = self.df[orig_name]
             
             if std_name in [
-                'cantidad', 'precio', 'precio_costo', 'precio_venta'
+                'cantidad', 'precio', 'precio_costo', 'precio_venta',
+                'margen_ganancia',
             ]:
                 clean_df[std_name] = self._clean_numeric(col_data)
             elif std_name == 'fecha':

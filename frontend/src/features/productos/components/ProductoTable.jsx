@@ -15,7 +15,7 @@ export default function ProductoTable({ items = [] }) {
       <table className="table">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>N°</th>
             <th>Código</th>
             <th>Nombre</th>
             <th>Categoría</th>
@@ -30,9 +30,9 @@ export default function ProductoTable({ items = [] }) {
           </tr>
         </thead>
         <tbody>
-          {items.map((p) => (
+          {items.map((p, index) => (
             <tr key={p.id}>
-              <td>{p.id}</td>
+              <td>{index + 1}</td>
               <td>{p.codigo}</td>
               <td>{p.nombre}</td>
               <td><Chip kind={p.categoria} /></td>

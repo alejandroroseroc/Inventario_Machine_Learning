@@ -6,10 +6,13 @@ import {
   ArchiveX,
   CheckCircle2,
   FileUp,
+  HelpCircle,
   PackageX,
+  Plus,
   RotateCcw,
   Search,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import { importarCSV } from "../importService";
 import { productoCreate, productosList } from "../service";
@@ -26,6 +29,8 @@ export default function ProductosPage() {
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const fileInputRef = useRef(null);
 
   const [tabInventario, setTabInventario] = useState("activos");
@@ -93,6 +98,7 @@ export default function ProductosPage() {
       await productoCreate(form);
       setOk("Producto guardado correctamente.");
       await load();
+      setShowCreateForm(false);
       return true;
     } catch (e) {
       setError(e?.message || "No se pudo crear el producto.");
@@ -183,36 +189,82 @@ export default function ProductosPage() {
 
       {tabInventario === "activos" && (
         <>
-          <section className="help" aria-labelledby="ayuda_inv_titulo">
-            <h3 id="ayuda_inv_titulo">Como registrar un medicamento</h3>
-            <ol>
-              <li>Escribe <strong>Codigo</strong> y <strong>Nombre</strong> tal como los usas en la drogueria.</li>
-              <li>Ingresa el <strong>Valor unitario</strong>. Con eso sugerimos <strong>Categoria ABC</strong> y <strong>ROP</strong>.</li>
-              <li>Si quieres, desactiva "Auto-sugerir" para ajustar manualmente la categoria o el ROP.</li>
-              <li>Guarda el producto. Lo veras en la tabla de abajo.</li>
-            </ol>
-            <p className="help__note">
-              Estas sugerencias son temporales. Cuando cargues ventas reales, el sistema propondra valores basados en tu historial.
-            </p>
-          </section>
-
           {error && <div className="alert alert--error" role="alert">{error}</div>}
           {ok && <div className="alert alert--ok" role="status">{ok}</div>}
 
-          <ProductoForm onSubmit={handleCreate} submitting={creating} />
-
           <div className="inventory-list-head">
-            <h3>Listado</h3>
-            <div className="inventory-search">
-              <Search size={16} />
-              <input
-                type="text"
-                placeholder="Buscar medicamento..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div>
+              <h3>Listado de medicamentos</h3>
+              <p>Consulta, busca y abre el detalle de cada producto activo.</p>
+            </div>
+
+            <div className="inventory-list-actions">
+              <div className="inventory-search">
+                <Search size={16} />
+                <input
+                  type="text"
+                  placeholder="Buscar medicamento..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn--primary btn--icon"
+                onClick={() => setShowCreateForm((value) => !value)}
+                aria-expanded={showCreateForm}
+                aria-controls="producto-create-panel"
+              >
+                {showCreateForm ? <X size={18} /> : <Plus size={18} />}
+                {showCreateForm ? "Cerrar formulario" : "Nuevo medicamento"}
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary btn--icon"
+                onClick={() => setShowHelp((value) => !value)}
+                aria-expanded={showHelp}
+                aria-controls="inventory-help-panel"
+              >
+                <HelpCircle size={18} />
+                Ayuda
+              </button>
             </div>
           </div>
+
+          {showHelp && (
+            <section className="help help--compact" id="inventory-help-panel" aria-labelledby="ayuda_inv_titulo">
+              <h3 id="ayuda_inv_titulo">Como registrar un medicamento</h3>
+              <ol>
+                <li>Escribe <strong>Codigo</strong> y <strong>Nombre</strong> tal como los usas en la drogueria.</li>
+                <li>Ingresa el <strong>Valor unitario</strong>. Con eso sugerimos <strong>Categoria ABC</strong> y <strong>ROP</strong>.</li>
+                <li>Si quieres, desactiva "Auto-sugerir" para ajustar manualmente la categoria o el ROP.</li>
+                <li>Guarda el producto. Lo veras en el listado.</li>
+              </ol>
+              <p className="help__note">
+                Estas sugerencias son temporales. Cuando cargues ventas reales, el sistema propondra valores basados en tu historial.
+              </p>
+            </section>
+          )}
+
+          {showCreateForm && (
+            <section className="create-panel" id="producto-create-panel" aria-labelledby="producto_create_title">
+              <div className="create-panel__head">
+                <div>
+                  <h3 id="producto_create_title">Nuevo medicamento</h3>
+                  <p>Registra el producto y, si ya lo tienes disponible, agrega el primer lote.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--icon"
+                  onClick={() => setShowCreateForm(false)}
+                >
+                  <X size={18} />
+                  Cerrar
+                </button>
+              </div>
+              <ProductoForm onSubmit={handleCreate} submitting={creating} />
+            </section>
+          )}
 
           {loading ? <p>Cargando...</p> : <ProductoTable items={filteredItems} />}
         </>

@@ -17,6 +17,8 @@
 .help { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 14px 0 20px; }
 .help h3 { margin-top: 0; }
 .help__note { font-size: 12px; color: #475569; }
+.help--compact{ margin-top:0; }
+.help--compact ol{ margin-bottom:10px; }
 
 /* ---- Cards & layout ---- */
 .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
@@ -165,9 +167,21 @@ a.btn{ color: inherit !important; text-decoration: none; }
   justify-content:space-between;
   align-items:center;
   gap:16px;
-  margin:24px 0 12px;
+  margin:18px 0 14px;
 }
 .inventory-list-head h3{ margin:0; }
+.inventory-list-head p{
+  margin:4px 0 0;
+  color:#64748b;
+  font-size:.92rem;
+}
+.inventory-list-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+}
 .inventory-search{
   display:flex;
   align-items:center;
@@ -188,6 +202,31 @@ a.btn{ color: inherit !important; text-decoration: none; }
   color:#1e293b;
 }
 .inventory-search input:focus{ box-shadow:none; border-color:transparent; }
+
+.create-panel{
+  margin:0 0 18px;
+  padding:16px;
+  border:1px solid #dbe3ee;
+  border-radius:12px;
+  background:#fff;
+}
+.create-panel__head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:14px;
+  padding-bottom:14px;
+  border-bottom:1px solid #e5e7eb;
+}
+.create-panel__head h3{ margin:0; color:#0f172a; }
+.create-panel__head p{ margin:4px 0 0; color:#64748b; font-size:.92rem; }
+.create-panel .card{
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
 
 .status-card{
   margin-top:16px;
@@ -303,7 +342,11 @@ a.btn{ color: inherit !important; text-decoration: none; }
 @media (max-width: 640px){
   .page__head,
   .inventory-list-head{ align-items:flex-start; flex-direction:column; }
+  .inventory-list-actions{ width:100%; justify-content:flex-start; }
   .inventory-search{ width:100%; min-width:0; }
+  .inventory-list-actions .btn{ width:100%; justify-content:center; }
+  .create-panel__head{ flex-direction:column; }
+  .create-panel__head .btn{ width:100%; justify-content:center; }
   .app-modal__footer{ flex-direction:column-reverse; }
   .app-modal__footer .btn{ width:100%; }
 }

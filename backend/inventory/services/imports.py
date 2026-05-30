@@ -13,6 +13,21 @@ from ml.cleaning import CSVCleaner
 from .productos import recalcular_productos
 
 
+HISTORICAL_LOT_NAMES = {"HISTORICO", "HISTÓRICO", "HISTORICAL"}
+
+
+def es_lote_historico(numero_lote: str) -> bool:
+    return str(numero_lote or "").strip().upper() in HISTORICAL_LOT_NAMES
+
+
+def normalizar_lotes_historicos(usuario) -> int:
+    return Lote.objects.filter(
+        producto__usuario=usuario,
+        numero_lote__in=HISTORICAL_LOT_NAMES,
+        stock_lote__lt=0,
+    ).update(stock_lote=0)
+
+
 class ImportService:
     @staticmethod
     def import_from_csv(file, user) -> Tuple[int, List[str]]:
@@ -212,7 +227,8 @@ class ImportService:
                         )
                         ventas_to_create.append(venta)
                         sales_rows.append((venta, producto, lote, cantidad, precio_venta, fecha, tipo_movimiento))
-                        lot_stock_delta[lote.id] -= cantidad
+                        if not es_lote_historico(lote_val):
+                            lot_stock_delta[lote.id] -= cantidad
 
                     count += 1
 
@@ -256,6 +272,8 @@ class ImportService:
 
                 if lotes_a_actualizar:
                     Lote.objects.bulk_update(lotes_a_actualizar, ["stock_lote"], batch_size=500)
+
+                normalizar_lotes_historicos(user)
 
             try:
                 recalcular_productos(usuario=user)

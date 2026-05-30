@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 from django.utils import timezone
-from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Value
+from django.db.models import Sum, F, Q, DecimalField, ExpressionWrapper, Value
 from django.db.models.functions import Coalesce
 
 from .models import Producto, Lote, Movimiento, Alerta, Venta
@@ -10,7 +10,13 @@ def productos_con_stock_total(usuario=None):
     if usuario:
         qs = qs.filter(usuario=usuario)
     return qs.annotate(
-        stock_total=Coalesce(Sum("lotes__stock_lote"), 0)
+        stock_total=Coalesce(
+            Sum(
+                "lotes__stock_lote",
+                filter=Q(lotes__estado="activo", lotes__stock_lote__gt=0),
+            ),
+            0,
+        )
     )
 
 def valor_total_inventario(usuario=None):
@@ -22,7 +28,7 @@ def valor_total_inventario(usuario=None):
         Coalesce(F("stock_lote"), 0) * Coalesce(F("producto__precio_costo"), 0),
         output_field=DecimalField(max_digits=18, decimal_places=2),
     )
-    qs = Lote.objects.select_related("producto").filter(estado="activo")
+    qs = Lote.objects.select_related("producto").filter(estado="activo", stock_lote__gt=0)
     if usuario:
         qs = qs.filter(producto__usuario=usuario)
     agg = qs.aggregate(total=Sum(expr))
@@ -105,7 +111,11 @@ def crear_lote(producto_id: int, fecha_caducidad, stock_lote: int, numero_lote: 
     )
     
 def stock_total_producto(producto_id: int) -> int:
-    return int(Lote.objects.filter(producto_id=producto_id).aggregate(s=Sum("stock_lote"))["s"] or 0)
+    return int(
+        Lote.objects
+        .filter(producto_id=producto_id, estado="activo", stock_lote__gt=0)
+        .aggregate(s=Sum("stock_lote"))["s"] or 0
+    )
 
 def alerta_stock_activa(producto_id: int):
     return Alerta.objects.filter(producto_id=producto_id, tipo="stock", estado="activa").first()

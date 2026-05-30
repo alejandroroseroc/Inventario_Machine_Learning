@@ -3,7 +3,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from django.db.models import Sum
+from django.db.models import Sum, Q
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from inventory.models import Alerta, Producto
@@ -83,7 +84,15 @@ class AlertasStockRecalcularPredictView(APIView):
         productos = (
             Producto.objects
             .filter(usuario=user_to_process)
-            .annotate(stock_total=Sum("lotes__stock_lote"))
+            .annotate(
+                stock_total=Coalesce(
+                    Sum(
+                        "lotes__stock_lote",
+                        filter=Q(lotes__estado="activo", lotes__stock_lote__gt=0),
+                    ),
+                    0,
+                )
+            )
             .values("id", "categoria", "stock_total")
         )
 

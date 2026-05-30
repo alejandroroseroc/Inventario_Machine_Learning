@@ -16,7 +16,8 @@ class CSVImportView(APIView):
         if not file_obj.name.endswith('.csv'):
             return Response({"error": "El archivo debe ser un CSV"}, status=status.HTTP_400_BAD_REQUEST)
 
-        count, errors = ImportService.import_from_csv(file_obj, request.user)
+        import_mode = request.data.get("import_mode", "inventory")
+        count, errors = ImportService.import_from_csv(file_obj, request.user, import_mode=import_mode)
 
         if errors:
             return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)

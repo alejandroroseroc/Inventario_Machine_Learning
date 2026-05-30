@@ -35,6 +35,10 @@ class CSVCleaner:
             'fecha_caducidad', 'expira', 'exp', 'vence',
             'fecha_exp',
         ],
+        'es_historico': [
+            'es_historico', 'historico', 'histórico',
+            'venta_historica', 'venta histórica',
+        ],
     }
 
     def __init__(self, df: pd.DataFrame):
@@ -68,7 +72,10 @@ class CSVCleaner:
 
     def _clean_date(self, series: pd.Series) -> pd.Series:
         """Intenta parsear fechas en diversos formatos."""
-        return pd.to_datetime(series, errors='coerce')
+        try:
+            return pd.to_datetime(series, errors='coerce', format='mixed')
+        except TypeError:
+            return pd.to_datetime(series, errors='coerce')
 
     def clean(self) -> Tuple[pd.DataFrame, List[str]]:
         """Ejecuta el proceso completo de limpieza."""
@@ -90,6 +97,10 @@ class CSVCleaner:
                 'margen_ganancia',
             ]:
                 clean_df[std_name] = self._clean_numeric(col_data)
+            elif std_name == 'es_historico':
+                clean_df[std_name] = col_data.astype(str).str.strip().str.lower().isin(
+                    ['1', 'true', 'si', 'sí', 'yes', 'y', 'historico', 'histórico']
+                )
             elif std_name == 'fecha':
                 clean_df[std_name] = self._clean_date(col_data)
             else:

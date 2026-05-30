@@ -18,7 +18,16 @@ class VentaItemSerializer(serializers.ModelSerializer):
 
 class VentaSerializer(serializers.ModelSerializer):
     items = VentaItemSerializer(many=True, read_only=True)
+    fecha_hora = serializers.SerializerMethodField()
 
     class Meta:
         model = Venta
-        fields = ["id", "fecha", "created_at", "total", "anulada", "motivo_anulacion", "items"]
+        fields = ["id", "fecha", "fecha_hora", "created_at", "total", "anulada", "motivo_anulacion", "items"]
+
+    def get_fecha_hora(self, obj):
+        movimiento = obj.movimientos.order_by("fecha_mov", "id").first()
+        if movimiento and movimiento.fecha_mov:
+            return movimiento.fecha_mov.isoformat()
+        if obj.created_at:
+            return obj.created_at.isoformat()
+        return None

@@ -3,6 +3,21 @@
 .page__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .page__title { margin: 0; }
 .page__actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.csv-import-mode{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:#475569;
+  font-size:.85rem;
+}
+.csv-import-mode span{ white-space:nowrap; }
+.csv-import-mode select{
+  min-width:180px;
+  height:42px;
+  background:#fff;
+  color:#0f172a;
+  font-weight:600;
+}
 
 /* ---- Screen-reader only ---- */
 .sr-only {
@@ -40,6 +55,9 @@
   .row, .row--2, .row--4 { grid-template-columns: 1fr; }
   .producto-edit-grid__row--4,
   .producto-edit-grid__row--3 { grid-template-columns: 1fr; }
+  .page__actions{ width:100%; }
+  .csv-import-mode{ width:100%; align-items:flex-start; flex-direction:column; }
+  .csv-import-mode select{ width:100%; }
 }
 
 /* ---- Form ---- */

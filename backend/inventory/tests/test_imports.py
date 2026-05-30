@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
-from inventory.models import Lote, Producto
+from inventory.models import Lote, Producto, Venta
 from inventory.repositories import (
     productos_con_stock_total,
     stock_total_producto,
@@ -120,6 +120,57 @@ class CSVImportMarginTests(TestCase):
             Lote.objects.get(producto=producto_existente, numero_lote="HISTORICO").stock_lote,
             0,
         )
+
+    @patch("inventory.services.imports.recalcular_productos")
+    def test_historical_flag_keeps_real_lote_without_reducing_stock(self, _mock_recalcular):
+        content = (
+            "codigo,nombre,fecha,cantidad,tipo_movimiento,lote,"
+            "precio_costo,precio_venta,fecha_vencimiento,es_historico\n"
+            "P006,Dolex,2026-01-15,20,entrada,REAL-006,1000,1500,2027-01-01,no\n"
+            "P006,Dolex,2025-12-01 10:30:00,8,salida,REAL-006,1000,1500,2027-01-01,si\n"
+        )
+        file_obj = SimpleUploadedFile("ventas.csv", content.encode("utf-8"))
+
+        count, errors = ImportService.import_from_csv(file_obj, self.user)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(count, 2)
+
+        producto = Producto.objects.get(usuario=self.user, codigo="P006")
+        lote = Lote.objects.get(producto=producto, numero_lote="REAL-006")
+        self.assertEqual(lote.stock_lote, 20)
+        self.assertEqual(stock_total_producto(producto.id), 20)
+
+        venta = Venta.objects.get(usuario=self.user, items__producto=producto)
+        movimiento = venta.movimientos.get()
+        self.assertEqual(movimiento.fecha_mov.date().isoformat(), "2025-12-01")
+
+    @patch("inventory.services.imports.recalcular_productos")
+    def test_historical_import_mode_does_not_require_row_flag(self, _mock_recalcular):
+        content = (
+            "codigo,nombre,fecha,cantidad,tipo_movimiento,lote,"
+            "precio_costo,precio_venta,fecha_vencimiento\n"
+            "P007,Dolex,2026-01-15,20,entrada,REAL-007,1000,1500,2027-01-01\n"
+            "P007,Dolex,2025-12-01 10:30:00,8,salida,REAL-007,1000,1500,2027-01-01\n"
+        )
+        file_obj = SimpleUploadedFile("ventas.csv", content.encode("utf-8"))
+
+        count, errors = ImportService.import_from_csv(
+            file_obj,
+            self.user,
+            import_mode="historical_sales",
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(count, 2)
+
+        producto = Producto.objects.get(usuario=self.user, codigo="P007")
+        lote = Lote.objects.get(producto=producto, numero_lote="REAL-007")
+        self.assertEqual(lote.stock_lote, 20)
+
+        venta = Venta.objects.get(usuario=self.user, items__producto=producto)
+        self.assertEqual(venta.fecha.isoformat(), "2025-12-01")
+        self.assertEqual(venta.movimientos.get().fecha_mov.date().isoformat(), "2025-12-01")
 
     def test_current_stock_metrics_ignore_negative_historical_lots(self):
         producto = Producto.objects.create(

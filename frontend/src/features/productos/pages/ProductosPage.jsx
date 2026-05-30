@@ -31,6 +31,7 @@ export default function ProductosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [importMode, setImportMode] = useState("inventory");
   const fileInputRef = useRef(null);
 
   const [tabInventario, setTabInventario] = useState("activos");
@@ -116,7 +117,7 @@ export default function ProductosPage() {
     setError("");
     setOk("");
     try {
-      const res = await importarCSV(file);
+      const res = await importarCSV(file, importMode);
       setOk(res.message || `Se importaron ${res.count} registros.`);
       await load();
     } catch (e) {
@@ -158,6 +159,17 @@ export default function ProductosPage() {
             onChange={handleImport}
             hidden
           />
+          <label className="csv-import-mode">
+            <span>Tipo de CSV</span>
+            <select
+              value={importMode}
+              onChange={(e) => setImportMode(e.target.value)}
+              disabled={importing}
+            >
+              <option value="inventory">Inventario actual</option>
+              <option value="historical_sales">Ventas historicas</option>
+            </select>
+          </label>
           <button
             className="btn btn--secondary btn--icon"
             onClick={() => fileInputRef.current?.click()}

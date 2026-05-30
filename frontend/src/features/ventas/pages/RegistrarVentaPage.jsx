@@ -86,14 +86,17 @@ export default function RegistrarVentaPage() {
   }, [notice]);
 
   const formatFechaHistorica = (venta) => {
-    if (venta?.created_at) {
-      return new Date(venta.created_at).toLocaleString("es-CO");
+    if (venta?.fecha_hora) {
+      return new Date(venta.fecha_hora).toLocaleString("es-CO");
     }
     if (venta?.fecha) {
       const [year, month, day] = String(venta.fecha).split("-").map(Number);
       if (year && month && day) {
         return new Date(year, month - 1, day).toLocaleDateString("es-CO");
       }
+    }
+    if (venta?.created_at) {
+      return new Date(venta.created_at).toLocaleString("es-CO");
     }
     return "-";
   };

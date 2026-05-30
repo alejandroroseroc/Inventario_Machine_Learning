@@ -163,7 +163,7 @@ class VentaHistorialView(APIView):
         page_num = request.query_params.get("page", 1)
         page_size = 15
 
-        qs = Venta.objects.filter(usuario=request.user).order_by("-id")
+        qs = Venta.objects.filter(usuario=request.user).order_by("-fecha", "-id")
         
         if year:
             qs = qs.filter(fecha__year=year)

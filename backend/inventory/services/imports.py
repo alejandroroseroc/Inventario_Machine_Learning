@@ -30,7 +30,7 @@ def normalizar_lotes_historicos(usuario) -> int:
 
 class ImportService:
     @staticmethod
-    def import_from_csv(file, user) -> Tuple[int, List[str]]:
+    def import_from_csv(file, user, import_mode: str = "inventory") -> Tuple[int, List[str]]:
         """
         Procesa un CSV, lo limpia y guarda los datos en la BD.
         Retorna (cantidad_registros, errores).
@@ -49,6 +49,14 @@ class ImportService:
         if clean_df.empty:
             return 0, ["El archivo no contiene filas validas para importar."]
 
+        import_mode = str(import_mode or "inventory").strip().lower()
+        historical_mode = import_mode in {
+            "historical_sales",
+            "ventas_historicas",
+            "ventas_históricas",
+            "historico",
+            "histórico",
+        }
         rows = clean_df.to_dict("records")
 
         try:
@@ -196,6 +204,11 @@ class ImportService:
 
                     tipo_movimiento = str(row.get("tipo_movimiento", "salida")).lower().strip()
                     es_entrada = tipo_movimiento == "entrada"
+                    es_historico = (
+                        (historical_mode and not es_entrada)
+                        or bool(row.get("es_historico", False))
+                        or es_lote_historico(lote_val)
+                    )
                     cantidad = int(row["cantidad"])
                     fecha = pd.to_datetime(row["fecha"]).to_pydatetime()
                     if timezone.is_naive(fecha):
@@ -227,7 +240,7 @@ class ImportService:
                         )
                         ventas_to_create.append(venta)
                         sales_rows.append((venta, producto, lote, cantidad, precio_venta, fecha, tipo_movimiento))
-                        if not es_lote_historico(lote_val):
+                        if not es_historico:
                             lot_stock_delta[lote.id] -= cantidad
 
                     count += 1

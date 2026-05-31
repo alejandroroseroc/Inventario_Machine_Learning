@@ -357,6 +357,54 @@ a.btn{ color: inherit !important; text-decoration: none; }
 .app-modal__body p{ margin:0; }
 .app-modal__footer{ justify-content:flex-end; border-top:1px solid #e5e7eb; background:#f8fafc; }
 
+.csv-help-modal{ width:min(760px, 100%); }
+.csv-help-modal__body{
+  display:grid;
+  gap:16px;
+}
+.csv-help-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:14px;
+}
+.csv-help-block{
+  padding:14px;
+  border:1px solid #dbe3ee;
+  border-radius:12px;
+  background:#f8fafc;
+}
+.csv-help-block--required{
+  border-color:#bbf7d0;
+  background:#f0fdf4;
+}
+.csv-help-block h4{
+  margin:0 0 10px;
+  color:#0f172a;
+  font-size:1rem;
+}
+.csv-help-block dl{
+  display:grid;
+  gap:8px;
+  margin:0;
+}
+.csv-help-block dt{
+  color:#0f172a;
+  font-weight:800;
+}
+.csv-help-block dd{
+  margin:2px 0 0;
+  color:#52637a;
+  font-size:.92rem;
+}
+.csv-help-note{
+  padding:12px 14px;
+  border:1px solid #bfdbfe;
+  border-radius:12px;
+  background:#eff6ff;
+  color:#1e3a8a;
+  font-size:.92rem;
+}
+
 @media (max-width: 640px){
   .page__head,
   .inventory-list-head{ align-items:flex-start; flex-direction:column; }
@@ -367,4 +415,5 @@ a.btn{ color: inherit !important; text-decoration: none; }
   .create-panel__head .btn{ width:100%; justify-content:center; }
   .app-modal__footer{ flex-direction:column-reverse; }
   .app-modal__footer .btn{ width:100%; }
+  .csv-help-grid{ grid-template-columns:1fr; }
 }

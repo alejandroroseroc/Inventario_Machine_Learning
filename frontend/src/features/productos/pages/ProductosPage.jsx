@@ -31,6 +31,7 @@ export default function ProductosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showHistoricalHelp, setShowHistoricalHelp] = useState(false);
   const [importMode, setImportMode] = useState("inventory");
   const fileInputRef = useRef(null);
 
@@ -163,13 +164,26 @@ export default function ProductosPage() {
             <span>Tipo de CSV</span>
             <select
               value={importMode}
-              onChange={(e) => setImportMode(e.target.value)}
+              onChange={(e) => {
+                setImportMode(e.target.value);
+                setShowHistoricalHelp(false);
+              }}
               disabled={importing}
             >
               <option value="inventory">Inventario actual</option>
               <option value="historical_sales">Ventas historicas</option>
             </select>
           </label>
+          {importMode === "historical_sales" && (
+            <button
+              type="button"
+              className="btn btn--secondary btn--icon"
+              onClick={() => setShowHistoricalHelp(true)}
+            >
+              <HelpCircle size={18} strokeWidth={2.4} />
+              Ayuda CSV historico
+            </button>
+          )}
           <button
             className="btn btn--secondary btn--icon"
             onClick={() => fileInputRef.current?.click()}
@@ -371,6 +385,73 @@ export default function ProductosPage() {
             </div>
           )}
         </section>
+      )}
+
+      {showHistoricalHelp && (
+        <div className="app-modal-backdrop" role="presentation" onClick={() => setShowHistoricalHelp(false)}>
+          <section
+            className="app-modal csv-help-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="csv_historical_help_title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="app-modal__header">
+              <h3 id="csv_historical_help_title">CSV de ventas historicas</h3>
+              <button
+                type="button"
+                className="app-modal__close"
+                onClick={() => setShowHistoricalHelp(false)}
+                aria-label="Cerrar ayuda"
+              >
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="app-modal__body csv-help-modal__body">
+              <p>
+                Este archivo alimenta el modelo de prediccion de demanda. Debe contener ventas reales ya ocurridas,
+                no el inventario actual.
+              </p>
+
+              <div className="csv-help-grid" aria-label="Campos requeridos para ventas historicas">
+                <div className="csv-help-block csv-help-block--required">
+                  <h4>Campos obligatorios</h4>
+                  <dl>
+                    <dt>Codigo de barras</dt>
+                    <dd>Identifica el medicamento vendido y debe coincidir con un producto registrado.</dd>
+                    <dt>Fecha de venta</dt>
+                    <dd>Fecha real de la venta. El modelo aprende la demanda diaria a partir de este dato.</dd>
+                    <dt>Cantidad vendida</dt>
+                    <dd>Numero de unidades vendidas en esa fecha.</dd>
+                  </dl>
+                </div>
+
+                <div className="csv-help-block">
+                  <h4>Campos opcionales</h4>
+                  <dl>
+                    <dt>Precio de venta</dt>
+                    <dd>Sirve para el valor financiero de la venta, pero no es necesario para entrenar el modelo.</dd>
+                    <dt>Numero de lote</dt>
+                    <dd>Sirve como referencia interna. No afecta la prediccion.</dd>
+                  </dl>
+                </div>
+              </div>
+
+              <div className="csv-help-note">
+                <strong>Recomendacion:</strong> carga ventas de varios dias y varios productos. Puedes incluir ventas
+                de hoy, pero el modelo entrena con ventas cerradas hasta el dia anterior para evitar predicciones
+                distorsionadas.
+              </div>
+            </div>
+
+            <footer className="app-modal__footer">
+              <button type="button" className="btn btn--primary" onClick={() => setShowHistoricalHelp(false)}>
+                Entendido
+              </button>
+            </footer>
+          </section>
+        </div>
       )}
     </div>
   );

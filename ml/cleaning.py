@@ -4,6 +4,7 @@ import numpy as np
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import re
+import unicodedata
 
 class CSVCleaner:
     """
@@ -13,10 +14,17 @@ class CSVCleaner:
     
     # Mapeo de nombres comunes a campos estándar
     COLUMN_MAPS = {
-        'codigo': ['cod', 'codigo', 'id_producto', 'sku', 'referencia', 'ref'],
+        'codigo': [
+            'cod', 'codigo', 'codigo_barras', 'codigo de barras',
+            'c_digo_de_barras', 'cod_barras', 'cod barras', 'barcode', 'ean',
+            'id_producto', 'sku', 'referencia', 'ref',
+        ],
         'nombre': ['nombre', 'producto', 'descripcion', 'item', 'articulo'],
-        'cantidad': ['cantidad', 'cant', 'qty', 'unidades', 'stock'],
-        'fecha': ['fecha', 'fec', 'date', 'momento', 'day'],
+        'cantidad': [
+            'cantidad', 'cantidad_vendida', 'cantidad vendida',
+            'cant', 'qty', 'unidades', 'stock',
+        ],
+        'fecha': ['fecha', 'fecha_venta', 'fecha de venta', 'fec', 'date', 'momento', 'day'],
         'lote': ['lote', 'batch', 'nro_lote', 'serie'],
         'tipo_movimiento': ['tipo_movimiento', 'tipo movimento', 'tipo', 'movement'],
         'precio_costo': ['precio_costo', 'costo_compra', 'precio costo', 'costo', 'precio_vta', 'precio'],
@@ -46,12 +54,25 @@ class CSVCleaner:
         self.column_mapping: Dict[str, str] = {}
         self.errors: List[str] = []
 
+    @staticmethod
+    def _normalize_column_name(value) -> str:
+        """Normaliza encabezados de CSV: tildes, espacios y simbolos."""
+        text = str(value).strip().lower()
+        text = unicodedata.normalize("NFKD", text)
+        text = "".join(ch for ch in text if not unicodedata.combining(ch))
+        text = re.sub(r"[^a-z0-9]+", "_", text)
+        return text.strip("_")
+
     def _detect_columns(self):
         """Detecta qué columnas del DF corresponden a nuestros campos estándar."""
         for standard_name, synonyms in self.COLUMN_MAPS.items():
+            valid_names = {
+                self._normalize_column_name(name)
+                for name in [standard_name] + synonyms
+            }
             for col in self.df.columns:
-                clean_col = str(col).lower().strip()
-                if clean_col == standard_name or clean_col in synonyms:
+                clean_col = self._normalize_column_name(col)
+                if clean_col in valid_names:
                     self.column_mapping[standard_name] = col
                     break
         

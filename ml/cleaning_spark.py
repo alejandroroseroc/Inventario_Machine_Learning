@@ -10,15 +10,24 @@ from pyspark.sql.types import (
     TimestampType, BooleanType,
 )
 from typing import Dict, List, Optional, Tuple
+import re
+import unicodedata
 
 
 # ── Mapeo de nombres comunes a campos estándar ───────────────────────────
 COLUMN_MAPS: Dict[str, List[str]] = {
-    "codigo":   ["cod", "codigo", "id_producto", "sku", "referencia", "ref"],
+    "codigo": [
+        "cod", "codigo", "codigo_barras", "codigo de barras",
+        "c_digo_de_barras", "cod_barras", "cod barras", "barcode", "ean",
+        "id_producto", "sku", "referencia", "ref",
+    ],
     "nombre":   ["nombre", "producto", "descripcion", "item", "articulo"],
-    "cantidad": ["cantidad", "cant", "qty", "unidades", "stock"],
+    "cantidad": [
+        "cantidad", "cantidad_vendida", "cantidad vendida",
+        "cant", "qty", "unidades", "stock",
+    ],
     "precio":   ["precio", "valor", "unitario", "costo", "price"],
-    "fecha":    ["fecha", "fec", "date", "momento", "day"],
+    "fecha":    ["fecha", "fecha_venta", "fecha de venta", "fec", "date", "momento", "day"],
     "lote":     ["lote", "batch", "nro_lote", "serie"],
 }
 
@@ -31,10 +40,18 @@ def _detect_column_mapping(columns: List[str]) -> Tuple[Dict[str, str], List[str
     mapping: Dict[str, str] = {}
     errors: List[str] = []
 
-    lower_cols = {c.lower().strip(): c for c in columns}
+    def normalize(value) -> str:
+        text = str(value).strip().lower()
+        text = unicodedata.normalize("NFKD", text)
+        text = "".join(ch for ch in text if not unicodedata.combining(ch))
+        text = re.sub(r"[^a-z0-9]+", "_", text)
+        return text.strip("_")
+
+    lower_cols = {normalize(c): c for c in columns}
 
     for standard_name, synonyms in COLUMN_MAPS.items():
         for syn in [standard_name] + synonyms:
+            syn = normalize(syn)
             if syn in lower_cols:
                 mapping[standard_name] = lower_cols[syn]
                 break
